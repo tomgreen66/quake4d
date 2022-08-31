@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __AASFILEMANAGER_H__
 #define __AASFILEMANAGER_H__
