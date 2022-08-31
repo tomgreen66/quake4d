@@ -1,5 +1,4 @@
 #! /bin/sh
-set -x
 #
 # Product setup script
 #
@@ -20,6 +19,12 @@ USE_XHOST=0
 # this is the message for su call, printf
 SU_MESSAGE="You need to run this installation as the super user.\nPlease enter the root password."
 
+if test -x /bin/su; then
+	SU_CMD=/bin/su
+else
+	SU_CMD=/usr/bin/su
+fi
+
 NULL=/dev/null
 # See if we have the XPG4 utilities (Solaris)
 if test -d /usr/xpg4/bin; then
@@ -32,7 +37,7 @@ DetectARCH()
 	status=1
 	case `uname -m` in
 	    amd64 | x86_64)
-		echo "amd64"
+		echo "x86_64"
 		status=0;;
 	    i?86 | i86*)
 		echo "x86"
@@ -64,30 +69,26 @@ DetectARCH()
 # Return the appropriate version string
 DetectLIBC()
 {
-	status=1
-	if [ `uname -s` != Linux ]; then
-		echo "glibc-2.1"
-		return $status
-	fi
-	if [ -f `echo /lib/libc.so.6* | tail -n 1` ]; then
-		# I'm not using glibc-specific binaries
-		# this step even fails on amd64 gentoo, only has GLIBC_2.2 2.3 in it's strings
-		echo "glibc-2.1"
-		status=0
-#		if [ fgrep GLIBC_2.1 /lib/libc.so.6* 2> $NULL >> $NULL ]; then
-#			echo "glibc-2.1"
-#			status=0
-#		else    
-#			echo "glibc-2.0"
-#			status=0
-#		fi        
-	elif [ -f /lib/libc.so.5 ]; then
-			echo "libc5"
-			status=0
-	else
-			echo "unknown"
-	fi
-	return $status
+    status=1
+	  if [ `uname -s` != Linux ]; then
+		  echo "glibc-2.1"
+		  return $status
+	  fi
+      if [ -f `echo /lib/libc.so.6* | tail -n 1` ]; then
+		  if fgrep GLIBC_2.1 /lib/libc.so.6* 2> $NULL >> $NULL; then
+	              echo "glibc-2.1"
+	              status=0
+	      else
+	              echo "glibc-2.0"
+	              status=0
+	      fi
+      elif [ -f /lib/libc.so.5 ]; then
+	      echo "libc5"
+	      status=0
+      else
+	      echo "unknown"
+      fi
+      return $status
 }
 
 DetectOS()
@@ -125,6 +126,19 @@ if [ "$1" = "-auth" ]
 then
   auth=1
   shift
+fi
+
+if [ "$auth" -eq 1 ]
+then
+  # if root is absolutely required
+  # this happens if xsu/su execs setup.sh but it still doesn't have root rights
+  if [ "$GET_ROOT" -eq 2 ]
+  then
+    # NOTE TTimo: this causes the following error message in some cases:
+    # return: can only `return' from a function or sourced script
+    # BUT: in other cases, the return is legit, if you replace by an exit call, it's broken
+    exit 1
+  fi
 fi
 
 # Find the installation program
@@ -205,18 +219,6 @@ __EOF__
     return "$failed"
 }
 
-if [ "$GET_ROOT" -eq 3 ]
-then
-	GOT_ROOT=`id -u`
-	if [ "$GOT_ROOT" != "0" ]
-	then
-		printf "$SU_MESSAGE\n"
-		echo "Press Enter to continue or Ctrl-C to abort"
-		read
-	fi
-	GET_ROOT=0
-fi
-
 # if we have not been through the auth yet, and if we need to get root, then prompt
 if [ "$auth" -eq 0 ] && [ "$GET_ROOT" -ne 0 ]
 then
@@ -226,12 +228,7 @@ then
 	if [ "$USE_XHOST" -eq 1 ]; then
 		xhost +127.0.0.1 2> $NULL > $NULL
 	fi
-    if [ "$GET_ROOT" -eq 1 ]
-    then
-      try_run xsu -e -a -u root -c "sh `pwd`/setup.sh -auth" $XSU_ICON -m "$XSU_MESSAGE"
-    else
     try_run xsu -e -a -u root -c "sh `pwd`/setup.sh -auth" $XSU_ICON
-    fi
     status="$?"
     # echo "got $status"
     # if try_run successfully executed xsu, it will return xsu's exit code
@@ -245,47 +242,39 @@ then
     elif [ "$status" -eq 1 ]
     then
       # xsu wasn't found, or failed to run
-      # if xsu actually ran and the auth was cancelled, $status is > 1
+      # if xsu actually ran and the auth was cancelled, $status is 2
       # try with su
-      # su will return 1 if auth failed
-      # we need to distinguish between su auth failed and su working, and still get setup.sh return code
       printf "$SU_MESSAGE\n"
-      try_run -absolute /bin/su root -c "export DISPLAY=$DISPLAY;sh `pwd`/setup.sh -auth"
+      try_run -absolute $SU_CMD root -c "export DISPLAY=$DISPLAY;sh `pwd`/setup.sh -auth"
       status="$?"
-	  if [ "$status" -eq 1 ] && [ "$GET_ROOT" -eq 1 ]
-      then
-        echo "Running setup as user"
-      else
-        exit $status
-      fi
+	  if [ "$status" -eq 0 ]; then
+		# the auth command was properly executed
+		exit 0
+	  else
+	    exit 1
+	  fi
     elif [ "$status" -eq 3 ]
     then
-      if [ "$GET_ROOT" -eq 1 ]
-      then
-        echo "Running setup as user"
-      else
-        # the auth failed or was canceled
-        # we don't want to even start the setup if not root
-        echo "Please run this installation as the super user"
-        exit 1
-      fi
+      # the auth failed or was canceled
+      # we don't want to even start the setup if not root
+      echo "Please run this installation as the super user"
+      exit 1
     fi
     # continue running as is
   fi
 fi
 
-# run the setup program (setup.gtk first, then setup)
-# except when trying setup.gtk first then console setup, always exit with 0
-# if the setup was cancelled, it is not our problem
+# Try to run the setup program
 try_run setup.gtk $args $*
-status="$?"
-if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then  # setup.gtk couldn't connect to X11 server - ignore
-try_run setup $args $*
-  status="$?"
-  if [ "$auth" -eq 1 ] && [ "$status" -ne 0 ]
-  then
-    # distinguish between failed su and failed su'ed setup.sh
-    exit 2
-  fi
-  exit $status
+status=$?
+if [ $status -eq 2 ] || [ $status -eq 127 ]; then  # setup.gtk couldn't connect to X11 server - ignore
+	try_run setup $args $* || {
+		if [ $status -ne 2 ]; then
+			echo "The setup program seems to have failed on $arch/$libc"
+			echo
+			echo $FATAL_ERROR
+		fi
+		status=1
+	}
 fi
+exit $status

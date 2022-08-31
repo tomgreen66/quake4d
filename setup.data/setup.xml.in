@@ -1,19 +1,22 @@
 <?xml version="1.0" standalone="yes"?>
-<install product="doom3-sdk" desc="DOOM III SDK" version="M4_VERSION" nouninstall="yes">
-	<eula>
-		License.SDK.txt
-	</eula>	
-	<readme>
-		README.SDK.txt
-	</readme>
-	doom3-sdk
-	<option required="true">
-		DOOM III SDK
-		<files>
-			MayaSetupStuff.zip
-			src
-			base
-			vehicles
-		</files>
-	</option>	
+<install product="M4_PRODUCT" desc="M4_DESC" version="M4_VERSION" nouninstall="yes" nopromptoverwrite="yes">
+  <eula>
+	License.txt
+  </eula>	
+  <readme>
+    README
+  </readme>
+  M4_PRODUCT
+  <option required="true">
+	M4_DESC
+	<files>
+	  Animation Examples
+	  Art Examples
+	  Definition File Examples
+	  Font Examples
+	  Map Examples
+	  mod Examples
+	  source/
+	</files>
+  </option>
 </install>
