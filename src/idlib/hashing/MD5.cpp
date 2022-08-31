@@ -52,7 +52,7 @@ reflect the addition of 16 longwords of new data.  MD5Update blocks
 the data and converts bytes into longwords for this routine.
 =================
 */
-void MD5_Transform( unsigned int state[4], unsigned int in[16] ) {
+void MD5_Transform( unsigned int state[4], unsigned int const in[16] ) {
     register unsigned int a, b, c, d;
 
     a = state[0];
@@ -60,7 +60,7 @@ void MD5_Transform( unsigned int state[4], unsigned int in[16] ) {
     c = state[2];
     d = state[3];
 
-	LittleRevBytes( in, sizeof(unsigned int), 16 );
+	LittleRevBytes( const_cast< unsigned int * >( in ), sizeof(unsigned int), 16 );
 
     MD5STEP(F1, a, b, c, d, in[0] + 0xd76aa478, 7);
     MD5STEP(F1, d, a, b, c, in[1] + 0xe8c7b756, 12);
@@ -130,7 +130,7 @@ void MD5_Transform( unsigned int state[4], unsigned int in[16] ) {
     MD5STEP(F4, c, d, a, b, in[2] + 0x2ad7d2bb, 15);
     MD5STEP(F4, b, c, d, a, in[9] + 0xeb86d391, 21);
 
-	LittleRevBytes( in, sizeof(unsigned int), 16 );
+	LittleRevBytes( const_cast< unsigned int * >( in ), sizeof(unsigned int), 16 );
 
     state[0] += a;
     state[1] += b;

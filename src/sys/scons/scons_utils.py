@@ -1,9 +1,11 @@
 # -*- mode: python -*-
-import sys, os, string, time, commands, re, pickle, StringIO, popen2, commands, pdb, zipfile, tempfile
+import sys, os, string, time, commands, re, pickle, StringIO, popen2, commands, pdb, zipfile
 import SCons
 
 # need an Environment and a matching buffered_spawn API .. encapsulate
 class idBuffering:
+
+	silent = False
 
 	def buffered_spawn( self, sh, escape, cmd, args, env ):
 		stderr = StringIO.StringIO()
@@ -21,8 +23,9 @@ class idBuffering:
 			print 'OSError ignored on command: %s' % command_string
 			retval = 0
 		print command_string
-		sys.stdout.write( stdout.getvalue() )
-		sys.stderr.write( stderr.getvalue() )
+		if ( retval != 0 or not self.silent ):
+			sys.stdout.write( stdout.getvalue() )
+			sys.stderr.write( stderr.getvalue() )
 		return retval		
 
 class idSetupBase:
@@ -61,7 +64,7 @@ class idSetupBase:
 			if ( p.match( i ) ):
 				major = p.match( i ).group(1)
 				break
-
+	
 		f = open( 'framework/async/AsyncNetwork.h' )
 		l = f.readlines()
 		f.close()
@@ -125,7 +128,8 @@ def checkLDD( target, source, env ):
 
 def SharedLibrarySafe( env, target, source ):
 	ret = env.SharedLibrary( target, source )
-	env.AddPostAction( ret, checkLDD )
+	if ( env['OS'] != 'Darwin' ):
+		env.AddPostAction( ret, checkLDD )
 	return ret
 
 def NotImplementedStub( *whatever ):
@@ -134,50 +138,57 @@ def NotImplementedStub( *whatever ):
 
 # --------------------------------------------------------------------
 
-class idGamePaks( idSetupBase ):
-
-	def BuildGamePak( self, target = None, source = None, env = None ):
-		# NOTE: ew should have done with zipfile module
-		temp_dir = tempfile.mkdtemp( prefix = 'gamepak' )
-		self.SimpleCommand( 'cp %s %s' % ( source[0].abspath, os.path.join( temp_dir, 'gamex86.so' ) ) )
-		self.SimpleCommand( 'strip %s' % os.path.join( temp_dir, 'gamex86.so' ) )
-		self.SimpleCommand( 'echo 2 > %s' % ( os.path.join( temp_dir, 'binary.conf' ) ) )
-		self.SimpleCommand( 'cd %s ; zip %s gamex86.so binary.conf' % ( temp_dir, os.path.join( temp_dir, target[0].abspath ) ) )
-		self.SimpleCommand( 'rm -r %s' % temp_dir )
-		return None
-
-# --------------------------------------------------------------------
-
 # get a clean error output when running multiple jobs
-def SetupBufferedOutput( env ):
+def SetupBufferedOutput( env, silent ):
 	buf = idBuffering()
+	buf.silent = silent
 	buf.env = env
 	env['SPAWN'] = buf.buffered_spawn
 
 # setup utilities on an environement
 def SetupUtils( env ):
-	gamepaks = idGamePaks()
-	env.BuildGamePak = gamepaks.BuildGamePak
 	env.SharedLibrarySafe = SharedLibrarySafe
-	try:
+	if ( os.path.exists( 'sys/scons/SDK.py' ) ):
 		import SDK
 		sdk = SDK.idSDK()
-		env.PreBuildSDK = sdk.PreBuildSDK
 		env.BuildSDK = sdk.BuildSDK
-	except:
-		print 'SDK.py hookup failed'
-		env.PreBuildSDK = NotImplementedStub
+	else:
 		env.BuildSDK = NotImplementedStub
-	try:
+
+	if ( os.path.exists( 'sys/scons/Setup.py' ) ):
 		import Setup
 		setup = Setup.idSetup()
+		env.Prepare = setup.Prepare
 		env.BuildSetup = setup.BuildSetup
-	except:
-		print 'Setup.py hookup failed'
+		env.BuildGamePak = setup.BuildGamePak
+	else:
+		env.Prepare = NotImplementedStub
 		env.BuildSetup = NotImplementedStub
+		env.BuildGamePak = NotImplementedStub
+
+	if ( os.path.exists( 'sys/scons/OSX.py' ) ):
+		import OSX
+		OSX = OSX.idOSX()
+		env.BuildBundle = OSX.BuildBundle
+	else:
+		env.BuildBundle = NotImplementedStub
 
 def BuildList( s_prefix, s_string ):
 	s_list = string.split( s_string )
 	for i in range( len( s_list ) ):
 		s_list[ i ] = s_prefix + '/' + s_list[ i ]
 	return s_list
+
+def ExtractSource( file ):
+	from xml.dom.minidom import parse
+	dom = parse( file )
+	files = dom.getElementsByTagName( 'File' )
+	l = []
+	for i in files:
+		s = i.getAttribute( 'RelativePath' )
+		s = s.encode('ascii', 'ignore')
+		s = re.sub( '\\\\', '/', s )
+		s = re.sub( '^\./', '', s )
+		if ( string.lower( s[-4:] ) == '.cpp' or string.lower( s[-2:] ) == '.c' ):
+			l.append( s )
+	return l

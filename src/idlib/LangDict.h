@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __LANGDICT_H__
 #define __LANGDICT_H__
@@ -30,7 +28,7 @@ public:
 	const char *			AddString( const char *str );
 	const char *			GetString( const char *str ) const;
 
-							// adds the value and key as passed (doesn't generate a "#str_xxxxx" key or ensure the key/value pair is unique)
+							// adds the value and key as passed (doesn't generate a "#str_xxxxxx" key or ensure the key/value pair is unique)
 	void					AddKeyVal( const char *key, const char *val );
 
 	int						GetNumKeyVals( void ) const;

@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __TIMER_H__
 #define __TIMER_H__

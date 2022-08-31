@@ -1,12 +1,35 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #include "../../idlib/precompiled.h"
 #pragma hdrstop
 
 #include "../Game_local.h"
+// RAVEN BEGIN
+#include "../ai/AI.h"
+#if !defined(__GAME_PROJECTILE_H__)
+	#include "../Projectile.h"
+#endif
+#if !defined(__GAME_WEAPON_H__)
+	#include "../Weapon.h"
+#endif
+#if !defined(__GAME_SPAWNER_H__)
+	#include "../spawner.h"
+#endif
+#if !defined(__GAME_VEHICLE_H__)
+	#include "../Vehicle/Vehicle.h"
+#endif
+#if !defined(__AI_MANAGER_H__)
+	#include "../ai/AI_Manager.h"
+#endif
+#if !defined(__INSTANCE_H__)
+	#include "../Instance.h"
+#endif
+// RAVEN END
 
+#ifdef _WIN32
 #include "TypeInfo.h"
+#else
+#include "NoGameTypeInfo.h"
+#endif
 
 /*
 ==================
@@ -51,7 +74,7 @@ void Cmd_EntityList_f( const idCmdArgs &args ) {
 			continue;
 		}
 
-		if ( !check->name.Filter( match, true ) ) {
+		if ( !check->name.Filter( match ) ) {
 			continue;
 		}
 
@@ -64,6 +87,50 @@ void Cmd_EntityList_f( const idCmdArgs &args ) {
 
 	gameLocal.Printf( "...%d entities\n...%d bytes of spawnargs\n", count, size );
 }
+
+/*
+===================
+Cmd_ClientEntityList_f
+===================
+*/
+void Cmd_ClientEntityList_f( const idCmdArgs &args ) {
+	int			e;
+	rvClientEntity	*check;
+	int			count;
+	idStr		match;
+
+	if ( args.Argc() > 1 ) {
+		match = args.Args();
+		match.Replace( " ", "" );
+	} else {
+		match = "";
+	}
+
+	count = 0;
+
+	gameLocal.Printf( "%-4s  %-20s\n", " Num", "Classname" );
+	gameLocal.Printf( "--------------------------------------------------------------------\n" );
+	for( e = 0; e < MAX_CENTITIES; e++ ) {
+		check = gameLocal.clientEntities[ e ];
+
+		idStr name( check->GetClassType().classname );
+
+		if ( !check ) {
+			continue;
+		}
+
+		if ( !name.Filter( match ) ) {
+			continue;
+		}
+				
+		gameLocal.Printf( "%4i: %-20s\n", e, name.c_str() );
+
+		count++;
+	}
+
+	gameLocal.Printf( "...%d entities\n", count );
+}
+
 
 /*
 ===================
@@ -145,7 +212,10 @@ void Cmd_Script_f( const idCmdArgs &args ) {
 	sprintf( funcname, "ConsoleFunction_%d", funccount++ );
 
 	script = args.Args();
-	sprintf( text, "void %s() {%s;}\n", funcname.c_str(), script );
+// RAVEN BEGIN
+// jscott: fixed sprintf to idStr
+	text = va( "void %s() {%s;}\n", funcname.c_str(), script );
+// RAVEN END
 	if ( gameLocal.program.CompileText( "console", text, true ) ) {
 		func = gameLocal.program.FindFunction( funcname );
 		if ( func ) {
@@ -159,6 +229,44 @@ void Cmd_Script_f( const idCmdArgs &args ) {
 		}
 	}
 }
+
+// RAVEN BEGIN
+// jscott: exports for tracking memory
+/*
+==================
+idGameEdit::ScriptSummary
+==================
+*/
+size_t idGameEdit::ScriptSummary( const idCmdArgs &args ) const {
+
+	return( gameLocal.program.ScriptSummary( args ) );
+}
+
+/*
+==================
+idGameEdit::ClassSummary
+==================
+*/
+size_t idGameEdit::ClassSummary( const idCmdArgs &args ) const {
+
+	common->Printf( "Classes         - %dK\n", idClass::GetUsedMemory() / 1024 );
+
+	return( idClass::GetUsedMemory() / 1024 );
+}
+
+/*
+==================
+idGameEdit::EntitySummary
+==================
+*/
+
+size_t idGameEdit::EntitySummary( const idCmdArgs &args ) const {
+
+	common->Printf( "CL & SV ents    - %dK\n", gameLocal.GetEntityMemoryUsage () / 1024);
+
+	return gameLocal.GetEntityMemoryUsage() / 1024;
+}
+// RAVEN END
 
 /*
 ==================
@@ -205,10 +313,15 @@ Kills all the monsters in a level.
 ==================
 */
 void Cmd_KillMonsters_f( const idCmdArgs &args ) {
-	KillEntities( args, idAI::Type );
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+	KillEntities( args, idAI::GetClassType() );
+// nmckenzie: rvSpawners
+	KillEntities( args, rvSpawner::GetClassType() );
 
 	// kill any projectiles as well since they have pointers to the monster that created them
-	KillEntities( args, idProjectile::Type );
+	KillEntities( args, idProjectile::GetClassType() );
+// RAVEN END
 }
 
 /*
@@ -222,8 +335,45 @@ void Cmd_KillMovables_f( const idCmdArgs &args ) {
 	if ( !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
-	KillEntities( args, idMoveable::Type );
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+	KillEntities( args, idMoveable::GetClassType() );
+// RAVEN END
 }
+
+// RAVEN BEGIN
+// bdube: vehicle code
+/*
+==================
+Cmd_KillVehicles_f
+==================
+*/
+void Cmd_KillVehicles_f( const idCmdArgs &args ) {
+	if ( !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	
+	rvVehicleController::KillVehicles ( );
+}
+
+void Cmd_KillMessage_f( const idCmdArgs &args ) {
+	if ( !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	
+	gameLocal.mpGame.SendDeathMessage( gameLocal.GetLocalPlayer(), gameLocal.GetLocalPlayer(), 2 );
+}
+
+void Cmd_APState_f( const idCmdArgs &args ) {
+	if ( !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	
+	for ( int i = 0; i < gameLocal.mpGame.assaultPoints.Num(); i++ ) {
+		gameLocal.Printf ( "Assault point #%d: owner: %d\n", gameLocal.mpGame.assaultPoints[i]->GetIndex(), gameLocal.mpGame.assaultPoints[i]->GetOwner() );
+	}
+}
+// RAVEN END
 
 /*
 ==================
@@ -236,29 +386,36 @@ void Cmd_KillRagdolls_f( const idCmdArgs &args ) {
 	if ( !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
-	KillEntities( args, idAFEntity_Generic::Type );
-	KillEntities( args, idAFEntity_WithAttachedHead::Type );
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+	KillEntities( args, idAFEntity_Generic::GetClassType() );
+	KillEntities( args, idAFEntity_WithAttachedHead::GetClassType() );
+// RAVEN END
 }
 
+
+// RITUAL BEGIN
+// squirrel: added DeadZone multiplayer mode
 /*
 ==================
-Cmd_Give_f
+GiveStuffToPlayer
 
-Give items to a client
+Used by the "give" and "buy" command line cmds
 ==================
 */
-void Cmd_Give_f( const idCmdArgs &args ) {
-	const char *name;
+void GiveStuffToPlayer( idPlayer* player, const char* name, const char* value )
+{
 	int			i;
 	bool		give_all;
-	idPlayer	*player;
+//	idPlayer* player = gameLocal.GetLocalPlayer();
 
-	player = gameLocal.GetLocalPlayer();
-	if ( !player || !gameLocal.CheatsOk() ) {
+	if( !player || !name )	{
 		return;
 	}
 
-	name = args.Argv( 1 );
+	if( !value ) {
+		value = "";
+	}
 
 	if ( idStr::Icmp( name, "all" ) == 0 ) {
 		give_all = true;
@@ -277,13 +434,16 @@ void Cmd_Give_f( const idCmdArgs &args ) {
 		}
 	}
 
-	if ( ( idStr::Cmpn( name, "weapon_", 7 ) == 0 ) || ( idStr::Cmpn( name, "item_", 5 ) == 0 ) || ( idStr::Cmpn( name, "ammo_", 5 ) == 0 ) ) {
+	if ( ( idStr::Cmpn( name, "weapon_", 7 ) == 0 ) || ( idStr::Cmpn( name, "item_", 5 ) == 0 ) || ( idStr::Cmpn( name, "ammo_", 5 ) == 0 ) || ( idStr::Icmp( name, "ammorefill" ) == 0 ) ) {
 		player->GiveItem( name );
 		return;
 	}
 
 	if ( give_all || idStr::Icmp( name, "health" ) == 0 )	{
 		player->health = player->inventory.maxHealth;
+		if ( player->IsInVehicle() ) {
+			player->GetVehicleController().Give ( "health", "9999" );
+		}
 		if ( !give_all ) {
 			return;
 		}
@@ -299,8 +459,11 @@ void Cmd_Give_f( const idCmdArgs &args ) {
 	}
 
 	if ( give_all || idStr::Icmp( name, "ammo" ) == 0 ) {
-		for ( i = 0 ; i < AMMO_NUMTYPES; i++ ) {
-			player->inventory.ammo[ i ] = player->inventory.MaxAmmoForAmmoClass( player, idWeapon::GetAmmoNameForNum( ( ammo_t )i ) );
+// RAVEN BEGIN
+// bdube: define changed
+		for ( i = 0 ; i < MAX_AMMOTYPES; i++ ) {
+			player->inventory.ammo[ i ] = player->inventory.MaxAmmoForAmmoClass( player, rvWeapon::GetAmmoNameForIndex( i ) );
+// RAVEN END		
 		}
 		if ( !give_all ) {
 			return;
@@ -313,31 +476,84 @@ void Cmd_Give_f( const idCmdArgs &args ) {
 			return;
 		}
 	}
-
-	if ( idStr::Icmp( name, "berserk" ) == 0 ) {
-		player->GivePowerUp( BERSERK, SEC2MS( 30.0f ) );
+// RAVEN BEGIN
+	if (idStr::Icmp(name, "quad") == 0) {
+		player->GivePowerUp( POWERUP_QUADDAMAGE, SEC2MS( 30.0f ) );
 		return;
 	}
 
 	if ( idStr::Icmp( name, "invis" ) == 0 ) {
-		player->GivePowerUp( INVISIBILITY, SEC2MS( 30.0f ) );
+		player->GivePowerUp( POWERUP_INVISIBILITY, SEC2MS( 30.0f ) );
 		return;
 	}
 
-	if ( idStr::Icmp( name, "pda" ) == 0 ) {
-		player->GivePDA( args.Argv(2), NULL );
+	if ( idStr::Icmp( name, "regen" ) == 0 ) {
+		player->GivePowerUp( POWERUP_REGENERATION, SEC2MS( 30.0f ) );
 		return;
 	}
 
-	if ( idStr::Icmp( name, "video" ) == 0 ) {
-		player->GiveVideo( args.Argv(2), NULL );
+	if ( idStr::Icmp( name, "haste" ) == 0 ) {
+		player->GivePowerUp( POWERUP_HASTE, SEC2MS( 30.0f ) );
 		return;
 	}
 
-	if ( !give_all && !player->Give( args.Argv(1), args.Argv(2) ) ) {
+	if (idStr::Icmp(name, "ammoregen") == 0) {
+		player->GivePowerUp( POWERUP_AMMOREGEN, -1 );
+		return;
+	}
+	
+	if (idStr::Icmp(name, "scout") == 0) {
+		player->GivePowerUp( POWERUP_SCOUT, -1 );
+		return;
+	}
+
+	if (idStr::Icmp(name, "doubler") == 0) {
+		player->GivePowerUp( POWERUP_DOUBLER, -1 );
+		return;
+	}
+
+	if (idStr::Icmp(name, "guard") == 0) {
+		player->GivePowerUp( POWERUP_GUARD, -1 );
+		return;
+	}
+// RAVEN END
+
+	if ( !idStr::Icmp ( name, "wpmod_all" ) ) {
+		player->GiveWeaponMods ( 0xFFFFFFFF );
+		return;
+	} else if ( !idStr::Cmpn( name, "wpmod_", 6 ) ) {
+		player->GiveWeaponMod(name);
+		return;
+	}
+
+	if ( !idStr::Cmpn( name, "stroggmod_", 10 ) ) {
+		player->Give ( name, "" );
+		return;
+	}
+
+	if ( !give_all && !player->Give( name, value ) ) {
 		gameLocal.Printf( "unknown item\n" );
 	}
 }
+
+/*
+==================
+Cmd_Give_f
+
+Give items to a client
+==================
+*/
+void Cmd_Give_f( const idCmdArgs &args ) {
+	idPlayer	*player;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player || !gameLocal.CheatsOk() ) {
+		return;
+	}
+
+	GiveStuffToPlayer( player, args.Argv(1), args.Argv(2) );
+}
+// RITUAL END
 
 /*
 ==================
@@ -384,6 +600,35 @@ void Cmd_God_f( const idCmdArgs &args ) {
 	} else {
 		player->godmode = true;
 		msg = "godmode ON\n";
+	}
+
+	gameLocal.Printf( "%s", msg );
+}
+
+/*
+==================
+Cmd_Undying_f
+
+Sets client to undying
+
+argv(0) undying
+==================
+*/
+void Cmd_Undying_f( const idCmdArgs &args ) {
+	char		*msg;
+	idPlayer	*player;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player || !gameLocal.CheatsOk() ) {
+		return;
+	}
+
+	if ( player->undying ) {
+		player->undying = false;
+		msg = "undying OFF\n";
+	} else {
+		player->undying = true;
+		msg = "undying ON\n";
 	}
 
 	gameLocal.Printf( "%s", msg );
@@ -462,11 +707,14 @@ void Cmd_Kill_f( const idCmdArgs &args ) {
 		} else {
 			player = gameLocal.GetClientByCmdArgs( args );
 			if ( !player ) {
-				common->Printf( "kill <client nickname> or kill <client index>\n" );
+				gameLocal.Printf( "kill <client nickname> or kill <client index>\n" );
 				return;
 			}
 			player->Kill( false, false );
-			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "say killed client %d '%s^0'\n", player->entityNumber, gameLocal.userInfo[ player->entityNumber ].GetString( "ui_name" ) ) );
+// RAVEN BEGIN
+// rhummer: localized this string.. (killed client)
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "say %s %d '%s^0'\n", common->GetLocalizedString( "#str_108022" ), player->entityNumber, gameLocal.userInfo[ player->entityNumber ].GetString( "ui_name" ) ) );
+// RAVEN END
 		}
 	} else {
 		player = gameLocal.GetLocalPlayer();
@@ -476,6 +724,97 @@ void Cmd_Kill_f( const idCmdArgs &args ) {
 		player->Kill( false, false );
 	}
 }
+
+// RAVEN BEGIN
+// bdube: jump points
+/*
+=================
+Cmd_DebugJump_f
+=================
+*/
+void Cmd_DebugJump_f( const idCmdArgs &args ) {
+	if (args.Argc() > 1) {
+		// going to a specific jump point as specified by second argument
+		gameDebug.JumpTo ( args.Argv( 1 ) );
+	} else {
+		// just go to next jump point as specified
+		gameDebug.JumpNext ( );
+	}
+}
+
+/*
+=================
+Cmd_DebugNextJumpPoint_f
+=================
+*/
+void Cmd_DebugNextJumpPoint_f( const idCmdArgs &args ) { 	
+	// just go to next jump point as specified
+	gameDebug.JumpNext ( );
+}
+
+/*
+=================
+Cmd_DebugPrevJumpPoint_f
+=================
+*/
+void Cmd_DebugPrevJumpPoint_f( const idCmdArgs &args ) {
+	// just go to previous jump point as specified
+	gameDebug.JumpPrev ( );
+}
+
+/*
+=================
+Cmd_AASExtractTactical_f
+=================
+*/
+void Cmd_AASExtractTactical_f( const idCmdArgs &args ) {
+	if (gameLocal.GetLocalPlayer())
+	{
+		gameLocal.GetLocalPlayer()->aasSensor->SearchDebug();
+	}
+}
+
+/*
+=================
+Cmd_CallScriptFunc_f
+=================
+*/
+void Cmd_CallScriptFunc_f( const idCmdArgs& args ) {
+	if( args.Argc() <= 1 ) {
+		gameLocal.Printf( "usage: call <retKey> FuncName <parm1> <Parm2>...\n" );
+		return;
+	}
+
+	idDict returnDict;
+	rvScriptFuncUtility util;
+
+	if( !util.Init(args) ) {
+		return;
+	}
+
+	util.CallFunc( &returnDict );
+
+	if( util.ReturnsAVal() && util.GetReturnKey() && util.GetReturnKey()[0] ) {
+		gameLocal.Printf( "%s: %s\n", util.GetReturnKey(), returnDict.GetString(util.GetReturnKey()) );
+	}
+}
+
+void Cmd_SetPlayerGravity_f( const idCmdArgs& args ) {
+	if( args.Argc() <= 1 ) {
+		gameLocal.Printf( "usage: setPlayerGravity 'x_magnitude y_magnitude z_magnitude\n" );
+		return;
+	}
+
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if( !player ) {
+		return;
+	}
+
+	idVec3 gravity;
+	sscanf( args.Argv(1), "%f %f %f", &gravity.x, &gravity.y, &gravity.z );
+	player->GetPhysics()->SetGravity( gravity );
+}
+// RAVEN END
 
 /*
 =================
@@ -527,10 +866,28 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 	}
 
 	text = args.Args();
+// RAVEN BEGIN
+// bdube: make sure text was specified
 	if ( text.Length() == 0 ) {
+		gameLocal.Printf( "usage: %s <text>\n", cmd );
 		return;
 	}
 
+// asalmon: check to see if the text passes the live decency standard
+#ifdef _XENON
+	if(!Sys_VerifyString(text.c_str()))
+	{
+		gameLocal.Printf( "Your message did not pass Xbox decency standards\n");
+		return;
+	}
+#endif
+
+
+// ddynerman: team speak only in team games
+	if ( team && !gameLocal.IsTeamGame() ) {
+		team = false;
+	}
+// RAVEN END
 	if ( text[ text.Length() - 1 ] == '\n' ) {
 		text[ text.Length() - 1 ] = '\0';
 	}
@@ -544,7 +901,14 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		player = gameLocal.localClientNum >= 0 ? static_cast<idPlayer *>( gameLocal.entities[ gameLocal.localClientNum ] ) : NULL;
 		if ( player ) {
 			name = player->GetUserInfo()->GetString( "ui_name", "player" );
+
+// RAVEN BEGIN
+// mekberg: activate the mphud gui so the time is right before receiving the chat message
+			if ( player->mphud ) {
+				player->mphud->Activate( true, gameLocal.time );
+			}
 		}
+// RAVEN END
 	} else {
 		name = "server";
 	}
@@ -555,7 +919,8 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( team ? GAME_RELIABLE_MESSAGE_TCHAT : GAME_RELIABLE_MESSAGE_CHAT );
 		outMsg.WriteString( name );
-		outMsg.WriteString( text, -1, false );
+		outMsg.WriteString( text );
+		outMsg.WriteString( "" );
 		networkSystem->ClientSendReliableMessage( outMsg );
 	} else {
 		gameLocal.mpGame.ProcessChatMessage( gameLocal.localClientNum, team, name, text, NULL );
@@ -746,6 +1111,7 @@ Cmd_Spawn_f
 ===================
 */
 void Cmd_Spawn_f( const idCmdArgs &args ) {
+#ifndef _MPBETA
 	const char *key, *value;
 	int			i;
 	float		yaw;
@@ -780,8 +1146,65 @@ void Cmd_Spawn_f( const idCmdArgs &args ) {
 		dict.Set( key, value );
 	}
 
-	gameLocal.SpawnEntityDef( dict );
+// RAVEN BEGIN
+// kfuller: want to know the name of the entity I spawned
+	idEntity *newEnt = NULL;
+	gameLocal.SpawnEntityDef( dict, &newEnt );
+
+	if (newEnt)	{
+		gameLocal.Printf("spawned entity '%s'\n", newEnt->name.c_str());
+	}
+// RAVEN END
+#endif // !_MPBETA
 }
+
+// RAVEN BEGIN
+// ddynerman: MP spawning command for performance testing
+/*
+===================
+Cmd_EvaluateMPPerformance_f
+===================
+*/
+void Cmd_EvaluateMPPerformance_f( const idCmdArgs &args ) {
+	float		yaw;
+	idVec3		org;
+	idPlayer	*player;
+	idDict		dict;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
+	int num = 15;
+
+	if ( args.Argc() > 1 ) {
+		num = atoi( args.Argv( 1 ) );
+	}
+
+	float angleStep = 360.0f / num;
+
+	const char* className = "char_marine";
+	
+	yaw = player->viewAngles.yaw;
+
+	for( int i = 0; i < num; i++ ) {
+		dict.Set( "classname", className );
+		dict.Set( "angle", va( "%f", yaw + 180 ) );
+
+		org = player->GetPhysics()->GetOrigin() + idAngles( 0, yaw + (i * angleStep), 0 ).ToForward() * 120 + idVec3( 0, 0, 1 );
+		dict.Set( "origin", org.ToString() );
+
+		idEntity *newEnt = NULL;
+		gameLocal.SpawnEntityDef( dict, &newEnt );
+
+		if (newEnt)	{
+			gameLocal.Printf("spawned entity '%s'\n", newEnt->name.c_str());
+		}
+	}
+}
+// RAVEN END
+
 
 /*
 ==================
@@ -811,6 +1234,30 @@ void Cmd_Damage_f( const idCmdArgs &args ) {
 
 /*
 ==================
+Cmd_Flashlight_f
+
+Toggles flashlight on specified entity
+==================
+*/
+void Cmd_Flashlight_f( const idCmdArgs &args ) {
+	if ( gameLocal.IsMultiplayer() || !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() != 3 ) {
+		gameLocal.Printf( "usage: flashight <name of entity to damage> <0 = off, 1 = on>\n" );
+		return;
+	}
+
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( !ent || !ent->IsType( idActor::GetClassType() ) ) {
+		gameLocal.Printf( "entity not found or not an actor\n" );
+		return;
+	}
+	ent->ProcessEvent( &AI_Flashlight, atoi( args.Argv( 2 ) ) );
+}
+
+/*
+==================
 Cmd_Remove_f
 
 Removes the specified entity
@@ -835,6 +1282,44 @@ void Cmd_Remove_f( const idCmdArgs &args ) {
 }
 
 /*
+==================
+Cmd_AI_DebugFilter_f
+
+Makes the targeted entity the only one ai_debugMove & ai_debugTactical cares about
+==================
+*/
+void Cmd_AI_DebugFilter_f( const idCmdArgs &args ) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		return;
+	}
+	idEntity *ent = NULL;
+	if ( args.Argc() != 2 ) 
+	{
+		//trace ahead
+		trace_t	trace;
+		idVec3 start = player->GetEyePosition();
+		idVec3 end = start + player->viewAngles.ToForward() * 2048.0f;
+		gameLocal.TracePoint( player, trace, start, end, MASK_SHOT_RENDERMODEL, player );
+		ent = gameLocal.GetTraceEntity( trace );
+	}
+	else
+	{	
+		idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+		if ( !ent ) {
+			gameLocal.Printf( "entity not found\n" );
+			return;
+		}
+	}
+
+	if ( !ent || !ent->IsType( idAI::GetClassType() ) ) {
+		ai_debugFilterString.SetString( "" );
+	} else {
+		ai_debugFilterString.SetString( ent->GetName() );
+	}
+}
+
+/*
 ===================
 Cmd_TestLight_f
 ===================
@@ -842,7 +1327,7 @@ Cmd_TestLight_f
 void Cmd_TestLight_f( const idCmdArgs &args ) {
 	int			i;
 	idStr		filename;
-	const char *key, *value, *name;
+	const char *key, *value, *name = NULL;
 	idPlayer *	player;
 	idDict		dict;
 
@@ -853,8 +1338,7 @@ void Cmd_TestLight_f( const idCmdArgs &args ) {
 
 	renderView_t	*rv = player->GetRenderView();
 
-	float fov = tan( idMath::M_DEG2RAD * rv->fov_x / 2 );
-
+	float fov = idMath::Tan( idMath::M_DEG2RAD * rv->fov_x / 2 );
 
 	dict.SetMatrix( "rotation", mat3_default );
 	dict.SetVector( "origin", rv->vieworg );
@@ -899,7 +1383,7 @@ Cmd_TestPointLight_f
 ===================
 */
 void Cmd_TestPointLight_f( const idCmdArgs &args ) {
-	const char *key, *value, *name;
+	const char *key, *value, *name = NULL;
 	int			i;
 	idPlayer	*player;
 	idDict		dict;
@@ -961,7 +1445,10 @@ void Cmd_PopLight_f( const idCmdArgs &args ) {
 	lastLight = NULL;
 	last = -1;
 	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-		if ( !ent->IsType( idLight::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !ent->IsType( idLight::GetClassType() ) ) {
+// RAVEN END
 			continue;
 		}
 
@@ -1003,7 +1490,10 @@ void Cmd_ClearLights_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "Clearing all lights.\n" );
 	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = next ) {
 		next = ent->spawnNode.Next();
-		if ( !ent->IsType( idLight::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !ent->IsType( idLight::GetClassType() ) ) {
+// RAVEN END
 			continue;
 		}
 
@@ -1018,11 +1508,12 @@ void Cmd_ClearLights_f( const idCmdArgs &args ) {
 	}
 }
 
+// RAVEN BEGIN
+// bdube: not using id effects
 /*
 ==================
 Cmd_TestFx_f
 ==================
-*/
 void Cmd_TestFx_f( const idCmdArgs &args ) {
 	idVec3		offset;
 	const char *name;
@@ -1053,6 +1544,8 @@ void Cmd_TestFx_f( const idCmdArgs &args ) {
 	dict.Set( "fx", name );
 	gameLocal.testFx = ( idEntityFx * )gameLocal.SpawnEntityType( idEntityFx::Type, &dict );
 }
+*/
+// RAVEN END
 
 #define MAX_DEBUGLINES	128
 
@@ -1229,6 +1722,9 @@ D_DrawDebugLines
 ==================
 */
 void D_DrawDebugLines( void ) {
+// RAVEN BEGIN
+// ddynerman: this eats about 5k us in release
+#ifdef _DEBUG
 	int i;
 	idVec3 forward, right, up, p1, p2;
 	idVec4 color;
@@ -1258,6 +1754,10 @@ void D_DrawDebugLines( void ) {
 			}
 		}
 	}
+#else
+	return;
+#endif
+// RAVEN END
 }
 
 /*
@@ -1357,13 +1857,23 @@ Cmd_ReloadAnims_f
 ==================
 */
 static void Cmd_ReloadAnims_f( const idCmdArgs &args ) {
+
 	// don't allow reloading anims when cheats are disabled,
 	// but if we're not in the game, it's ok
 	if ( gameLocal.GetLocalPlayer() && !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
 
-	animationLib.ReloadAnims();
+// RAVEN BEGIN
+// mekberg: disable non pre-cached warnings
+	fileSystem->SetIsFileLoadingAllowed( true );
+
+// jsinger: animationLib changed to a pointer
+	animationLib->ReloadAnims();
+
+// mekberg: enable non pre-cached warnings
+	fileSystem->SetIsFileLoadingAllowed( false );
+// RAVEN END
 }
 
 /*
@@ -1395,12 +1905,30 @@ static void Cmd_ListAnims_f( const idCmdArgs &args ) {
 
 		gameLocal.Printf( "----------------\n" );
 		num = animator.NumAnims();
+// RAVEN BEGIN
+// rjohnson: more output for animators
+		idFile *FH = fileSystem->OpenFileAppend( "animations.txt" );
 		for( i = 0; i < num; i++ ) {
-			gameLocal.Printf( "%s\n", animator.AnimFullName( i ) );
+			for( int j = 0; ; j++ ) {
+				const char *fileName = animator.AnimMD5Name( i, j );
+
+				if ( !fileName[0] ) {
+					break;
+				}
+				gameLocal.Printf( "%s\t%s\n", animator.AnimFullName( i ), animator.AnimMD5Name( i, 0 ) );
+				if ( FH ) {
+					FH->Printf( "%s\t%s\n", animator.AnimFullName( i ), animator.AnimMD5Name( i, 0 ) );
+				}
+			}
 		}
 		gameLocal.Printf( "%d anims\n", num );
+		fileSystem->CloseFile( FH );
+// RAVEN END
 	} else {
-		animationLib.ListAnims();
+// RAVEN BEGIN
+// jsinger: animationLib changed to a pointer
+		animationLib->ListAnims();
+// RAVEN END
 
 		size = 0;
 		num = 0;
@@ -1416,6 +1944,38 @@ static void Cmd_ListAnims_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "%d memory used in %d entity animators\n", size, num );
 	}
 }
+
+// RAVEN BEGIN
+// jscott: export for memory tracking
+/*
+================
+idGameEdit::ListAnims
+================
+*/
+void idGameEdit::PrintMemInfo( MemInfo *mi ) {
+
+	int		i, count, totalSize;
+	idAAS	*aas;
+
+	totalSize = 0;
+	count = 0;
+	for( i = 0; i < gameLocal.GetNumAAS(); i++ ) {
+
+		aas = gameLocal.GetAAS( i );
+		if( aas ) {
+
+			totalSize += aas->StatsSummary();
+			count++;
+		}
+	}
+
+	mi->aasAssetsTotal = totalSize;
+	mi->aasAssetsCount = count;
+
+	// jsinger: animationLib changed to a pointer
+	animationLib->PrintMemInfo( mi );
+}
+// RAVEN END
 
 /*
 ==================
@@ -1481,6 +2041,9 @@ static void Cmd_TestDamage_f( const idCmdArgs &args ) {
 Cmd_TestBoneFx_f
 ==================
 */
+// RAVEN BEGIN
+// bdube: not using
+/*
 static void Cmd_TestBoneFx_f( const idCmdArgs &args ) {
 	idPlayer *player;
 	const char *bone, *fx;
@@ -1500,6 +2063,8 @@ static void Cmd_TestBoneFx_f( const idCmdArgs &args ) {
 
 	player->StartFxOnBone( fx, bone );
 }
+*/
+// RAVEN END
 
 /*
 ==================
@@ -1539,7 +2104,7 @@ static void Cmd_WeaponSplat_f( const idCmdArgs &args ) {
 		return;
 	}
 
-	player->weapon.GetEntity()->BloodSplat( 2.0f );
+	player->weapon->BloodSplat( 2.0f );
 }
 
 /*
@@ -1555,7 +2120,7 @@ static void Cmd_SaveSelected_f( const idCmdArgs &args ) {
 	idMapFile *mapFile = gameLocal.GetLevelMap();
 	idDict dict;
 	idStr mapName;
-	const char *name;
+	const char *name = NULL;
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
@@ -1593,12 +2158,18 @@ static void Cmd_SaveSelected_f( const idCmdArgs &args ) {
 		mapEnt->epairs.Set( "name", s->name );
 	}
 
-	if ( s->IsType( idMoveable::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+	if ( s->IsType( idMoveable::GetClassType() ) ) {
+// RAVEN END
 		// save the moveable state
 		mapEnt->epairs.Set( "origin", s->GetPhysics()->GetOrigin().ToString( 8 ) );
 		mapEnt->epairs.Set( "rotation", s->GetPhysics()->GetAxis().ToString( 8 ) );
 	}
-	else if ( s->IsType( idAFEntity_Generic::Type ) || s->IsType( idAFEntity_WithAttachedHead::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+	else if ( s->IsType( idAFEntity_Generic::GetClassType() ) || s->IsType( idAFEntity_WithAttachedHead::GetClassType() ) ) {
+// RAVEN END
 		// save the articulated figure state
 		dict.Clear();
 		static_cast<idAFEntity_Base *>(s)->SaveState( dict );
@@ -1638,7 +2209,7 @@ static void Cmd_SaveMoveables_f( const idCmdArgs &args ) {
 	idMapEntity *mapEnt;
 	idMapFile *mapFile = gameLocal.GetLevelMap();
 	idStr mapName;
-	const char *name;
+	const char *name = NULL;
 
 	if ( !gameLocal.CheatsOk() ) {
 		return;
@@ -1647,7 +2218,10 @@ static void Cmd_SaveMoveables_f( const idCmdArgs &args ) {
 	for( e = 0; e < MAX_GENTITIES; e++ ) {
 		m = static_cast<idMoveable *>(gameLocal.entities[ e ]);
 
-		if ( !m || !m->IsType( idMoveable::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !m || !m->IsType( idMoveable::GetClassType() ) ) {
+// RAVEN END
 			continue;
 		}
 
@@ -1676,7 +2250,16 @@ static void Cmd_SaveMoveables_f( const idCmdArgs &args ) {
 	for( e = 0; e < MAX_GENTITIES; e++ ) {
 		m = static_cast<idMoveable *>(gameLocal.entities[ e ]);
 
-		if ( !m || !m->IsType( idMoveable::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !m )
+		{
+			continue;
+		}
+// jdischler: need to check for idMoveableItem as well
+		if ( !m->IsType( idMoveable::GetClassType()) && !m->IsType( idMoveableItem::GetClassType()) )
+		{
+// RAVEN END
 			continue;
 		}
 
@@ -1721,7 +2304,7 @@ static void Cmd_SaveRagdolls_f( const idCmdArgs &args ) {
 	idMapFile *mapFile = gameLocal.GetLevelMap();
 	idDict dict;
 	idStr mapName;
-	const char *name;
+	const char *name = NULL;
 
 	if ( !gameLocal.CheatsOk() ) {
 		return;
@@ -1742,7 +2325,10 @@ static void Cmd_SaveRagdolls_f( const idCmdArgs &args ) {
 			continue;
 		}
 
-		if ( !af->IsType( idAFEntity_WithAttachedHead::Type ) && !af->IsType( idAFEntity_Generic::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !af->IsType( idAFEntity_WithAttachedHead::GetClassType() ) && !af->IsType( idAFEntity_Generic::GetClassType() ) ) {
+// RAVEN END
 			continue;
 		}
 
@@ -1826,6 +2412,18 @@ static void Cmd_GameError_f( const idCmdArgs &args ) {
 	gameLocal.Error( "game error" );
 }
 
+// RAVEN BEGIN
+// rjohnson: entity usage stats
+/*
+==================
+Cmd_ListEntityStats_f
+==================
+*/
+static void Cmd_ListEntityStats_f( const idCmdArgs &args ) {
+	gameLocal.ListEntityStats( args );
+}
+// RAVEN END
+
 /*
 ==================
 Cmd_SaveLights_f
@@ -1838,7 +2436,7 @@ static void Cmd_SaveLights_f( const idCmdArgs &args ) {
 	idMapFile *mapFile = gameLocal.GetLevelMap();
 	idDict dict;
 	idStr mapName;
-	const char *name;
+	const char *name = NULL;
 
 	if ( !gameLocal.CheatsOk() ) {
 		return;
@@ -1855,7 +2453,10 @@ static void Cmd_SaveLights_f( const idCmdArgs &args ) {
 	for( e = 0; e < MAX_GENTITIES; e++ ) {
 		light = static_cast<idLight*>(gameLocal.entities[ e ]);
 
-		if ( !light || !light->IsType( idLight::Type ) ) {
+// RAVEN BEGIN
+// jnewquist: Use accessor for static class type 
+		if ( !light || !light->IsType( idLight::GetClassType() ) ) {
+// RAVEN END
 			continue;
 		}
 
@@ -1964,6 +2565,8 @@ static void Cmd_TestSave_f( const idCmdArgs &args ) {
 	fileSystem->CloseFile( f );
 }
 
+// RAVEN BEGIN
+#if 0
 /*
 ==================
 Cmd_RecordViewNotes_f
@@ -2070,6 +2673,8 @@ static void Cmd_ShowViewNotes_f( const idCmdArgs &args ) {
 		return;
 	}
 }
+#endif
+// RAVEN END
 
 /*
 =================
@@ -2255,8 +2860,183 @@ void Cmd_TestId_f( const idCmdArgs &args ) {
 	if ( idStr::Cmpn( id, STRTABLE_ID, STRTABLE_ID_LENGTH ) != 0 ) {
 		id = STRTABLE_ID + id;
 	}
-	gameLocal.mpGame.AddChatLine( common->GetLanguageDict()->GetString( id ), "<nothing>", "<nothing>", "<nothing>" );	
+	gameLocal.mpGame.AddChatLine( common->GetLocalizedString( id ), "<nothing>", "<nothing>", "<nothing>" );	
 }
+
+// RAVEN BEGIN
+// ddynerman: instance testing commands
+void Cmd_SetInstance_f( const idCmdArgs& args ) {
+	if( !gameLocal.isServer ) {
+		gameLocal.Warning( "Cmd_SetInstance_f(): setInstance can only be run on a server\n" );
+		return;
+	}
+
+	if ( args.Argc() <= 2 ) {
+		common->Printf( "usage: setInstance <client> <instance id>\n" );
+		return;
+	}
+
+	int client = atoi( args.Argv( 1 ) );
+	int instanceID = atoi( args.Argv( 2 ) );
+
+	if( client < 0 || client >= MAX_CLIENTS || !gameLocal.entities[ client ] ) {
+		gameLocal.Warning( "Cmd_SetInstance_f(): Invalid clientnum %d\n", client );
+		return;
+	}
+
+	idPlayer* player = (idPlayer*)gameLocal.entities[ client ];
+
+	gameLocal.Printf( "Cmd_SetInstance_f(): Switching %d: %s to instance %d\n", client, gameLocal.userInfo[ client ].GetString( "ui_name", "unknown" ), instanceID );
+
+	player->JoinInstance( instanceID );
+}
+
+void Cmd_ListInstances_f( const idCmdArgs& args ) {
+	if( !gameLocal.isServer ) {
+		gameLocal.Warning( "Cmd_ListInstances_f(): listInstances can only be run on a server\n" );
+		return;
+	}
+
+	for( int i = 0; i < gameLocal.GetNumInstances(); i++ ) {
+		gameLocal.Printf("Instance %d:\n", i );
+		for( int j = 0; j < MAX_CLIENTS; j++ ) {
+			idPlayer* player = (idPlayer*)gameLocal.entities[ j ];
+			if( player && player->GetInstance() == i ) {
+				gameLocal.Printf( "\t%d: %s\n", j, player->GetUserInfo()->GetString( "ui_name" ) );
+			}
+		}
+	}
+}
+
+void Cmd_AddIcon_f( const idCmdArgs& args ) {
+	if ( args.Argc() <= 1 ) {
+		common->Printf( "usage: addIcon <client>\n" );
+		return;
+	}
+	
+	int client = atoi( args.Argv( 1 ) );
+	
+	iconManager->AddIcon( client, "textures/mp/awards/capture" );
+}
+// RAVEN END
+
+// RITUAL BEGIN
+// squirrel: Mode-agnostic buymenus
+void Cmd_ToggleBuyMenu_f( const idCmdArgs& args ) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if ( player && player->CanBuy() )
+	{
+		gameLocal.mpGame.OpenLocalBuyMenu();
+	}
+}
+
+void Cmd_BuyItem_f( const idCmdArgs& args ) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		common->Printf( "ERROR: Cmd_BuyItem_f() failed, since GetLocalPlayer() was NULL.\n", player );
+		return;
+	}
+
+	player->GenerateImpulseForBuyAttempt( args.Argv(1) );
+}
+// RITUAL END
+
+void Cmd_PlayerEmote_f( const idCmdArgs& args ) {
+	if( gameLocal.GetLocalPlayer() == NULL ) {
+		gameLocal.Warning( "Cmd_Emote_f() - local player is NULL" );
+		return;
+	}
+
+	if ( args.Argc() <= 1 ) {
+		gameLocal.Printf( "usage: emote <emote>\n" );
+		gameLocal.Printf( "\ttry 'taunt', 'salute', 'grab_a'\n" );
+		return;
+	}
+
+	if( !idStr::Icmp( args.Argv( 1 ), "taunt" ) ) {
+		gameLocal.GetLocalPlayer()->SetEmote( PE_TAUNT );
+	} else if( !idStr::Icmp( args.Argv( 1 ), "grab_a" ) ) {
+		gameLocal.GetLocalPlayer()->SetEmote( PE_GRAB_A );
+	} else if( !idStr::Icmp( args.Argv( 1 ), "grab_b" ) ) {
+		gameLocal.GetLocalPlayer()->SetEmote( PE_GRAB_B );
+	} else if( !idStr::Icmp( args.Argv( 1), "salute" ) ) {
+		gameLocal.GetLocalPlayer()->SetEmote( PE_SALUTE );
+	} else if( !idStr::Icmp( args.Argv( 1), "cheer" ) ) {
+		gameLocal.GetLocalPlayer()->SetEmote( PE_CHEER );
+	} else {
+		gameLocal.Printf( "Invalid emote '%s'\n", args.Argv( 1 ) );
+		gameLocal.Printf( "\ttry 'taunt', 'salute', 'grab'\n" );
+	}
+	
+}
+
+// mekberg: added
+void Cmd_SetPMCVars_f ( const idCmdArgs &args ) {
+	if ( gameLocal.isMultiplayer ) {
+		return;
+	}
+
+	if ( gameLocal.GetLocalPlayer( ) ) {
+		gameLocal.GetLocalPlayer( )->SetPMCVars( );
+	}
+}
+
+void Cmd_FadeSound_f( const idCmdArgs &args )	{
+
+	if( args.Argc() < 2)	{
+		return;
+	}
+
+	float fadeDB = 0.0f;
+	float fadeTime = 0.0f;
+
+	idStr _fadeDB = args.Argv( 1);
+	fadeDB = atof( _fadeDB );
+
+	idStr _fadeTime = args.Argv( 2);
+	fadeTime = atof( _fadeTime );
+
+	soundSystem->FadeSoundClasses( SOUNDWORLD_GAME, SOUND_CLASS_MUSICAL, 0.0f - fadeDB, fadeTime );
+
+}
+
+void Cmd_TestClientModel_f( const idCmdArgs& args ) {
+	rvClientEntity* face;
+	const idDict* dict = gameLocal.FindEntityDefDict( "player_marine_client", false );
+
+	gameLocal.SpawnClientEntityDef( *dict, &face, false );
+
+//	face = new rvClientAFEntity( *dict );
+//	face->Spawn( dict );
+//	face->SetOrigin( vec3_zero );
+//	face->SetAxis( mat3_identity );
+//	face->SetModel( "model_player_marine" );
+}
+
+
+// RAVEN END
+
+void Cmd_CheckSave_f( const idCmdArgs &args );
+
+void Cmd_ShuffleTeams_f( const idCmdArgs& args ) {
+	gameLocal.mpGame.ShuffleTeams();
+}
+
+#ifndef _FINAL
+void Cmd_ClientOverflowReliable_f( const idCmdArgs& args ) {
+	idBitMsg	outMsg;
+	byte		msgBuf[ 114688 ];
+
+	for( int i = 0; i < 10; i++ ) {
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( -1 );
+		for( int j = 0; j < 8190; j++ ) {
+			outMsg.WriteByte( j );
+		}
+		networkSystem->ClientSendReliableMessage( outMsg );
+	}
+}
+#endif
 
 /*
 =================
@@ -2267,13 +3047,17 @@ so it can perform tab completion
 =================
 */
 void idGameLocal::InitConsoleCommands( void ) {
-	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
-	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
-	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );
+// RAVEN BEGIN
+// jscott: typeinfo gone - didn't work, it was unfinished
+//	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
+//	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
+//	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );
+// RAVEN END
 	cmdSystem->AddCommand( "game_memory",			idClass::DisplayInfo_f,		CMD_FL_GAME,				"displays game class info" );
 	cmdSystem->AddCommand( "listClasses",			idClass::ListClasses_f,		CMD_FL_GAME,				"lists game classes" );
 	cmdSystem->AddCommand( "listThreads",			idThread::ListThreads_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"lists script threads" );
 	cmdSystem->AddCommand( "listEntities",			Cmd_EntityList_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"lists game entities" );
+	cmdSystem->AddCommand( "listClientEntities",	Cmd_ClientEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists client entities" );
 	cmdSystem->AddCommand( "listActiveEntities",	Cmd_ActiveEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists active game entities" );
 	cmdSystem->AddCommand( "listMonsters",			idAI::List_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"lists monsters" );
 	cmdSystem->AddCommand( "listSpawnArgs",			Cmd_ListSpawnArgs_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"list the spawn args of an entity", idGameLocal::ArgCompletion_EntityName );
@@ -2284,6 +3068,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "give",					Cmd_Give_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"gives one or more items" );
 	cmdSystem->AddCommand( "centerview",			Cmd_CenterView_f,			CMD_FL_GAME,				"centers the view" );
 	cmdSystem->AddCommand( "god",					Cmd_God_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"enables god mode" );
+	cmdSystem->AddCommand( "undying",				Cmd_Undying_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"enables undying mode (take damage down to 1 health, but do not die)" );
 	cmdSystem->AddCommand( "notarget",				Cmd_Notarget_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"disables the player as a target" );
 	cmdSystem->AddCommand( "noclip",				Cmd_Noclip_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"disables collision detection for the player" );
 	cmdSystem->AddCommand( "kill",					Cmd_Kill_f,					CMD_FL_GAME,				"kills the player" );
@@ -2304,8 +3089,14 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "blinkline",				Cmd_BlinkDebugLine_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"blinks a debug line" );
 	cmdSystem->AddCommand( "listLines",				Cmd_ListDebugLines_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists all debug lines" );
 	cmdSystem->AddCommand( "playerModel",			Cmd_PlayerModel_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"sets the given model on the player", idCmdSystem::ArgCompletion_Decl<DECL_MODELDEF> );
-	cmdSystem->AddCommand( "testFx",				Cmd_TestFx_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"tests an FX system", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
-	cmdSystem->AddCommand( "testBoneFx",			Cmd_TestBoneFx_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests an FX system bound to a joint", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
+	cmdSystem->AddCommand( "flashlight",			Cmd_Flashlight_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"toggle actor's flashlight", idGameLocal::ArgCompletion_AIName );
+	
+	cmdSystem->AddCommand( "shuffleTeams",			Cmd_ShuffleTeams_f,			CMD_FL_GAME,				"shuffle teams" );
+// RAVEN BEGIN
+// bdube: not using id effect system
+//	cmdSystem->AddCommand( "testFx",				Cmd_TestFx_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"tests an FX system", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
+//	cmdSystem->AddCommand( "testBoneFx",			Cmd_TestBoneFx_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests an FX system bound to a joint", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
+// RAVEN END
 	cmdSystem->AddCommand( "testLight",				Cmd_TestLight_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests a light" );
 	cmdSystem->AddCommand( "testPointLight",		Cmd_TestPointLight_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"tests a point light" );
 	cmdSystem->AddCommand( "popLight",				Cmd_PopLight_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"removes the last created light" );
@@ -2343,31 +3134,105 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "clearLights",			Cmd_ClearLights_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"clears all lights" );
 	cmdSystem->AddCommand( "gameError",				Cmd_GameError_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"causes a game error" );
 
+// RAVEN BEGIN
+// rjohnson: entity usage stats
+	cmdSystem->AddCommand( "listEntityStats",		Cmd_ListEntityStats_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists global entity stats" );
+// ddynerman: mp spawning test command
+	cmdSystem->AddCommand( "evaluateMPPerformance",	Cmd_EvaluateMPPerformance_f,CMD_FL_GAME|CMD_FL_CHEAT,	"spawns serveral player models", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF> );
+	cmdSystem->AddCommand( "listMapEntities",		idGameLocal::Cmd_PrintMapEntityNumbers_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists map entity numbers" );
+	cmdSystem->AddCommand( "listSpawnIds",			idGameLocal::Cmd_PrintSpawnIds_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists map entity numbers" );
+// RAVEN END
+
 #ifndef	ID_DEMO_BUILD
 	cmdSystem->AddCommand( "disasmScript",			Cmd_DisasmScript_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"disassembles script" );
+// RAVEN BEGIN
+// rjohnson: removed old not taking system
+/*
 	cmdSystem->AddCommand( "recordViewNotes",		Cmd_RecordViewNotes_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"record the current view position with notes" );
 	cmdSystem->AddCommand( "showViewNotes",			Cmd_ShowViewNotes_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"show any view notes for the current map, successive calls will cycle to the next note" );
 	cmdSystem->AddCommand( "closeViewNotes",		Cmd_CloseViewNotes_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"close the view showing any notes for this map" );
+*/
+// RAVEN END
 	cmdSystem->AddCommand( "exportmodels",			Cmd_ExportModels_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"exports models", ArgCompletion_DefFile );
 
 	// multiplayer client commands ( replaces old impulses stuff )
-	cmdSystem->AddCommand( "clientDropWeapon",		idMultiplayerGame::DropWeapon_f, CMD_FL_GAME,			"drop current weapon" );
+	//cmdSystem->AddCommand( "clientDropWeapon",		idMultiplayerGame::DropWeapon_f, CMD_FL_GAME,			"drop current weapon" );
 	cmdSystem->AddCommand( "clientMessageMode",		idMultiplayerGame::MessageMode_f, CMD_FL_GAME,			"ingame gui message mode" );
 	// FIXME: implement
-//	cmdSystem->AddCommand( "clientVote",			idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: clientVote yes | no" );
-//	cmdSystem->AddCommand( "clientCallVote",		idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: clientCallVote si_.. proposed_value" );
+	cmdSystem->AddCommand( "clientVote",			idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: clientVote yes | no" );
+	cmdSystem->AddCommand( "clientCallVote",		idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: clientCallVote si_.. proposed_value" );
 	cmdSystem->AddCommand( "clientVoiceChat",		idMultiplayerGame::VoiceChat_f,	CMD_FL_GAME,			"voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "clientVoiceChatTeam",	idMultiplayerGame::VoiceChatTeam_f,	CMD_FL_GAME,		"team voice chats: clientVoiceChat <sound shader>" );
+// RAVEN BEGIN
+	// jshepard
+	cmdSystem->AddCommand( "forceTeamChange",				idMultiplayerGame::ForceTeamChange_f,			CMD_FL_GAME,		"force team change: forceTeamChange <id>" );
+	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"removes a client id from the ban list: removeClientFromBanList <client id>" );
+
+#ifndef _XBOX
+// shouchard:  more voice chat stuff (non-XBOX)
+	cmdSystem->AddCommand( "clientvoicemute",		idMultiplayerGame::VoiceMute_f, CMD_FL_GAME,			"mute the specified player's incoming voicechat" );
+	cmdSystem->AddCommand( "clientvoiceunmute",		idMultiplayerGame::VoiceUnmute_f, CMD_FL_GAME,			"unmute the specified player's incoming voicechat" );
+#endif // _XBOX
+// RAVEN END
 
 	// multiplayer server commands
+	cmdSystem->AddCommand( "verifyServerSettings",	idGameLocal::VerifyServerSettings_f,	CMD_FL_GAME,	"verifies the game type can be played on the map" );
 	cmdSystem->AddCommand( "serverMapRestart",		idGameLocal::MapRestart_f,	CMD_FL_GAME,				"restart the current game" );
-	cmdSystem->AddCommand( "serverForceReady",	idMultiplayerGame::ForceReady_f,CMD_FL_GAME,				"force all players ready" );
+	cmdSystem->AddCommand( "serverForceReady",		idMultiplayerGame::ForceReady_f,CMD_FL_GAME,				"force all players ready" );
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );
 #endif
+
+	cmdSystem->AddCommand( "CheckTeamBalance", idMultiplayerGame::CheckTeamBalance_f, CMD_FL_GAME, "helper for team switching in the guis - <team to switch to> <named event for yes> <named event for no> <named event for same team>" );
 
 	// localization help commands
 	cmdSystem->AddCommand( "nextGUI",				Cmd_NextGUI_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"teleport the player to the next func_static with a gui" );
 	cmdSystem->AddCommand( "testid",				Cmd_TestId_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"output the string for the specified id." );
+
+// RAVEN BEGIN
+// bdube: vehicle code
+	cmdSystem->AddCommand( "killVehicles",			Cmd_KillVehicles_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"kills all vehicles" );
+	cmdSystem->AddCommand( "killMessage",			Cmd_KillMessage_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"prints a fake death message" );
+	cmdSystem->AddCommand( "apState",				Cmd_APState_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"prints AP state" );
+// bdube: jump points
+	cmdSystem->AddCommand( "jump",					Cmd_DebugJump_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"jumps to a specific debug jump point" );
+	cmdSystem->AddCommand( "nextjumppoint",			Cmd_DebugNextJumpPoint_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"jumps to the next debug jump point " );
+	cmdSystem->AddCommand( "prevjumppoint",			Cmd_DebugPrevJumpPoint_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"jumps to the previous debug jump point" );
+// cdr: Added Extract Tactical
+	cmdSystem->AddCommand( "extract_tactical",		Cmd_AASExtractTactical_f,	CMD_FL_GAME,				"pulls tactical information for the current position." );
+// RAVEN END
+
+// RAVEN BEGIN
+// abahr
+	cmdSystem->AddCommand( "call",					Cmd_CallScriptFunc_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"calls script function and prints out return val" );
+	cmdSystem->AddCommand( "setPlayerGravity",		Cmd_SetPlayerGravity_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"sets players local gravity" );
+// cdr
+	cmdSystem->AddCommand( "ai_debugFilter",		Cmd_AI_DebugFilter_f,		CMD_FL_GAME,				"ai_debugMove and ai_debugTactical only work on the specified entity (if none, does one you're looking at)", idGameLocal::ArgCompletion_AIName );
+// ddynerman: multiple arena/CW stuff
+	cmdSystem->AddCommand( "setInstance",			Cmd_SetInstance_f,			CMD_FL_GAME,				"sets a player's world instance" );
+	cmdSystem->AddCommand( "addIcon",				Cmd_AddIcon_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"adds a test icon" );
+	cmdSystem->AddCommand( "listInstances",			Cmd_ListInstances_f,		CMD_FL_GAME,				"lists instances" );
+// ddynerman: emote anims
+	cmdSystem->AddCommand( "emote",					Cmd_PlayerEmote_f,			CMD_FL_GAME,				"plays an emote" );
+
+	cmdSystem->AddCommand( "checkSave",				Cmd_CheckSave_f,			CMD_FL_GAME,				"tests save system" );
+
+// jshepard: fade music in / out
+	cmdSystem->AddCommand( "fadeSound",				Cmd_FadeSound_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"fades all sound by X decibles over Y seconds" );
+
+// mekberg: added.
+	cmdSystem->AddCommand( "setPMCVars",			Cmd_SetPMCVars_f,			CMD_FL_GAME,				"Resets player movement cvars" );
+
+	cmdSystem->AddCommand( "testClientModel",		Cmd_TestClientModel_f,		CMD_FL_GAME,				"" );
+#ifndef _FINAL
+	cmdSystem->AddCommand( "clientOverflowReliable", Cmd_ClientOverflowReliable_f, CMD_FL_GAME,				"" );
+#endif
+// RAVEN END
+// RITUAL START
+// squirrel: Mode-agnostic buymenus
+	cmdSystem->AddCommand( "buyMenu",				Cmd_ToggleBuyMenu_f,		CMD_FL_GAME,				"Toggle buy menu (if in a buy zone and the game type supports it)" );
+	cmdSystem->AddCommand( "buy",					Cmd_BuyItem_f,				CMD_FL_GAME,				"Buy an item (if in a buy zone and the game type supports it)" );
+// RITUAL END
+
 }
 
 /*

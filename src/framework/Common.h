@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __COMMON_H__
 #define __COMMON_H__
@@ -12,6 +10,17 @@
 ==============================================================
 */
 
+
+// RAVEN BEGIN
+// mekberg: added more save types
+typedef enum {
+	ST_REGULAR,
+	ST_QUICK,
+	ST_AUTO,
+	ST_CHECKPOINT,
+} saveType_t;
+// RAVEN END
+
 typedef enum {
 	EDITOR_NONE					= 0,
 	EDITOR_RADIANT				= BIT(1),
@@ -22,18 +31,34 @@ typedef enum {
 	EDITOR_SOUND				= BIT(6),
 	EDITOR_DECL					= BIT(7),
 	EDITOR_AF					= BIT(8),
-	EDITOR_PARTICLE				= BIT(9),
-	EDITOR_PDA					= BIT(10),
-	EDITOR_AAS					= BIT(11),
-	EDITOR_MATERIAL				= BIT(12)
-} toolFlag_t;
+	EDITOR_PDA					= BIT(9),
+	EDITOR_FX					= BIT(10),
+	EDITOR_REVERB				= BIT(11),
+	EDITOR_PLAYBACKS			= BIT(12),
+	EDITOR_MODVIEW				= BIT(13),
+	EDITOR_LOGVIEW				= BIT(14),
+	EDITOR_ENTVIEW				= BIT(15),
+	EDITOR_MATERIAL				= BIT(16),
+
+	// Just flags to prevent caching of unneeded assets
+	EDITOR_AAS					= BIT(17),
+	EDITOR_RENDERBUMP			= BIT(18),
+	EDITOR_SPAWN_GUI			= BIT(19),
+
+	// Specifies that a decl validation run is happening
+	EDITOR_DECL_VALIDATING		= BIT(20),
+
+	EDITOR_ALL					= -1
+};
+// RAVEN END
+
+#define MAX_OUTPUT_HISTORY		16
 
 #define STRTABLE_ID				"#str_"
 #define STRTABLE_ID_LENGTH		5
 
 extern idCVar		com_version;
 extern idCVar		com_skipRenderer;
-extern idCVar		com_asyncInput;
 extern idCVar		com_asyncSound;
 extern idCVar		com_machineSpec;
 extern idCVar		com_purgeAll;
@@ -45,44 +70,102 @@ extern idCVar		com_showMemoryUsage;
 extern idCVar		com_showAsyncStats;
 extern idCVar		com_showSoundDecoders;
 extern idCVar		com_makingBuild;
+extern idCVar		com_skipUltraQuality;
 extern idCVar		com_updateLoadSize;
 extern idCVar		com_videoRam;
+
+// RAVEN BEGIN
+// ksergent: added bundler 
+extern idCVar		com_Bundler;
+
+#ifndef _XENON
+// nrausch: generate rdf's for xenon load screens
+extern idCVar		com_MakeLoadScreens;
+#endif
+
+// rjohnson: added quick load
+extern idCVar		com_QuickLoad;
+// rjohnson: added limits stuff
+extern idCVar		com_Limits;
+// jsinger: added build for binary lexer
+extern idCVar		com_BinaryWrite;
+extern idCVar		com_BinaryRead;
+// jsinger: added to support serialization/deserialization of binary decls
+#ifdef RV_BINARYDECLS
+extern idCVar		com_BinaryDeclRead;
+#endif
+// jsinger: added to support loading of all decls from a single file
+#ifdef RV_SINGLE_DECL_FILE
+extern idCVar		com_SingleDeclFile;
+extern idCVar		com_WriteSingleDeclFIle;
+#endif
+// jshepard: warning suppresion
+extern idCVar		com_uniqueWarnings;
+// amccarthy: show Mem_Alloc tag statistics
+extern idCVar		com_showMemAllocTags;
+#if defined(_XENON)
+// mwhitlock: changes for Xenon to enable us to use texture resources from .xpr bundles.
+extern idCVar		com_showXenTexCacheStats;
+extern idCVar		com_showXenHardwareTimers;
+// ksergent: show thread usage.
+extern idCVar		com_showXenThreadUsage;
+#endif // _XENON
+extern idCVar		sys_lang;
+// RAVEN END
 
 extern int			time_gameFrame;			// game logic time
 extern int			time_gameDraw;			// game present time
 extern int			time_frontend;			// renderer frontend time
 extern int			time_backend;			// renderer backend time
+// RAVEN BEGIN
+extern int			time_waiting;			// game logic time
+// RAVEN END
 
 extern int			com_frameTime;			// time for the current frame in milliseconds
 extern volatile int	com_ticNumber;			// 60 hz tics, incremented by async function
-extern int			com_editors;			// current active editor(s)
-extern bool			com_editorActive;		// true if an editor has focus
 
-#ifdef _WIN32
+// RAVEN BEGIN
+// bdube: added timing dict
+extern bool			com_debugHudActive;		// The debug hud is active in the game
+// RAVEN END
+
+#ifdef _WINDOWS
 const char			DMAP_MSGID[] = "DMAPOutput";
 const char			DMAP_DONE[] = "DMAPDone";
-extern HWND			com_hwndMsg;
-extern bool			com_outputMsg;
 #endif
 
-struct MemInfo_t {
+// RAVEN BEGIN
+// bdube: forward declarations
+class idInterpreter;
+class idProgram;
+
+// converted to a class so the idStr gets constructed
+class MemInfo {
+public:
+					MemInfo( void );
+
 	idStr			filebase;
 
 	int				total;
 	int				assetTotals;
 
-	// memory manager totals
-	int				memoryManagerTotal;
-
-	// subsystem totals
-	int				gameSubsystemTotal;
-	int				renderSubsystemTotal;
-
 	// asset totals
 	int				imageAssetsTotal;
 	int				modelAssetsTotal;
 	int				soundAssetsTotal;
+// RAVEN BEGIN
+	int				collAssetsTotal;
+	int				animsAssetsTotal;
+	int				aasAssetsTotal;
+
+	int				imageAssetsCount;
+	int				modelAssetsCount;
+	int				soundAssetsCount;
+	int				collAssetsCount;
+	int				animsAssetsCount;
+	int				aasAssetsCount;
 };
+// RAVEN END
 
 class idCommon {
 public:
@@ -118,8 +201,39 @@ public:
 								// set once to clear the cvar from +set for early init code
 	virtual void				StartupVariable( const char *match, bool once ) = 0;
 
+// RAVEN BEGIN
+	virtual	int					GetUserCmdHz( void ) const = 0;
+
+	virtual int					GetUserCmdMSec( void ) const = 0;
+
+								// Returns com_frameTime - which is 0 if a command is added to the command line
+	virtual int					GetFrameTime( void ) const = 0;
+
+								// returns if the game is processing the last frame when it processes multiple frames
+	virtual bool				IsRenderableGameFrame( void ) const = 0;
+
+	virtual void				SetRenderableGameFrame( bool in ) = 0;
+
+								// returns the last message from common->Error
+	virtual const char			*GetErrorMessage( void ) const = 0;
+
 								// Initializes a tool with the given dictionary.
-	virtual void				InitTool( const toolFlag_t tool, const idDict *dict ) = 0;
+	virtual void				InitTool( const int tool, const idDict *dict ) = 0;
+
+								// Returns true if an editor has focus
+	virtual bool				IsToolActive( void ) const = 0;
+
+								// Returns an interface to source control
+	virtual class rvISourceControl *GetSourceControl( void ) = 0;
+// RAVEN END
+
+// RAVEN BEGIN
+// dluetscher: added the following method to initialize each of the memory heaps 
+#ifdef _RV_MEM_SYS_SUPPORT
+	virtual void				InitHeaps( void ) = 0;		// initializes each of the memory heaps for use
+	virtual void				ShutdownHeaps( void ) = 0;	// shuts down each of the memory heaps from further use
+#endif
+// RAVEN END
 
 								// Activates or deactivates a tool.
 	virtual void				ActivateTool( bool active ) = 0;
@@ -130,8 +244,28 @@ public:
 								// Writes cvars with the given flags to a file.
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd ) = 0;
 
+// RAVEN BEGIN
+// bdube: new exports
+								// Modview thinks in the middle of a game frame
+	virtual void				ModViewThink ( void ) = 0;	
+	
+// rjohnson: added option for guis to always think
+	virtual void				RunAlwaysThinkGUIs ( int time ) = 0;
+
+								// Debbugger hook to check if a breakpoint has been hit
+	virtual void				DebuggerCheckBreakpoint ( idInterpreter* interpreter, idProgram* program, int instructionPointer ) = 0;
+
+// scork: need to test if validating to catch some model errors that would stop the validation and convert to warnings...
+	virtual bool				DoingDeclValidation( void ) = 0;
+// scork: guess
+	virtual void				SetCrashReportAutoSendString( const char *psString ) = 0;
+
+	virtual void				LoadToolsDLL( void ) = 0;
+	virtual void				UnloadToolsDLL( void ) = 0;
+// RAVEN END
+
 								// Begins redirection of console output to the given buffer.
-	virtual void				BeginRedirect( char *buffer, int buffersize, void (*flush)( const char * ) ) = 0;
+	virtual void				BeginRedirect( char *buffer, int buffersize, void (*flush)( const char * ), bool rcon = false ) = 0;
 
 								// Stops redirection of console output.
 	virtual void				EndRedirect( void ) = 0;
@@ -169,8 +303,27 @@ public:
 								// static internal errors or cases where the system may be corrupted.
 	virtual void				FatalError( const char *fmt, ... ) id_attribute((format(printf,2,3))) = 0;
 
-								// Returns a pointer to the dictionary with language specific strings.
-	virtual const idLangDict *	GetLanguageDict( void ) = 0;
+// RAVEN BEGIN
+								// Brings up notepad with the warnings generated while running the game
+	virtual void				DumpWarnings( void ) = 0;
+
+								// Returns the localised string of the token, of the token if it does not begin with #str_
+	virtual const char *		GetLocalizedString( const char *token, int langIndex = -1 ) = 0;
+
+								// Returns the localised string at position 'index'
+	virtual const idLangKeyValue * GetLocalizedString( int index, int langIndex = -1 ) = 0;
+
+								// Returns the number of languages the game found
+	virtual int					GetNumLanguages( void ) const = 0;
+
+								// Returns the number of strings in the English langdict
+	virtual int					GetNumLocalizedStrings( void ) const = 0;
+	
+								// Returns the name of the language
+	virtual const char *		GetLanguage( int index ) const = 0;
+
+								// Returns whether the language has VO
+	virtual bool				LanguageHasVO( int index ) const = 0;
 
 								// Returns key bound to the command
 	virtual const char *		KeysFromBinding( const char *bind ) = 0;
@@ -180,11 +333,19 @@ public:
 
 								// Directly sample a button.
 	virtual int					ButtonState( int key ) = 0;
-
+	
 								// Directly sample a keystate.
 	virtual int					KeyState( int key ) = 0;
+
+// mekberg: added
+	virtual int					GetRModeForMachineSpec( int machineSpec ) const = 0;
+	virtual void				SetDesiredMachineSpec( int machineSpec ) = 0;
+// RAVEN END
+
+								// returns true if we are currently executing an rcon operation
+	virtual bool				IsRCon( void ) const = 0;
 };
 
-extern idCommon *		common;
+extern idCommon *				common;
 
 #endif /* !__COMMON_H__ */

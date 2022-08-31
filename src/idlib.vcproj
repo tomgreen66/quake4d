@@ -1,13 +1,14 @@
-<?xml version="1.0" encoding = "Windows-1252"?>
+<?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="7.00"
+	Version="7.10"
 	Name="idLib"
 	ProjectGUID="{49BEC5C6-B964-417A-851E-808886B57400}"
-	SccProjectName=""
+	RootNamespace="idLib"
+	SccProjectName="Perforce Project"
 	SccAuxPath=""
-	SccLocalPath=""
-	SccProvider=""
+	SccLocalPath=".."
+	SccProvider="MSSCCI:NXN alienbrain"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -16,28 +17,31 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="idLib/DebugDLL"
-			IntermediateDirectory="idLib/DebugDLL"
+			OutputDirectory="../$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="$(OutDir)"
 			ConfigurationType="4"
+			UseOfMFC="0"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="mssdk/include"
-				PreprocessorDefinitions="_D3SDK,__DOOM__,__IDLIB__,WIN32,_DEBUG,_WINDOWS"
+				PreprocessorDefinitions="_DEBUG,_WINDOWS,Q4SDK"
 				MinimalRebuild="FALSE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
+				BufferSecurityCheck="TRUE"
+				EnableFunctionLevelLinking="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="3"
 				PrecompiledHeaderThrough=""
-				PrecompiledHeaderFile="$(IntDir)/idLib.pch"
-				AssemblerListingLocation="$(IntDir)/"
-				ObjectFile="$(IntDir)/"
-				ProgramDataBaseFileName="$(IntDir)/"
-				BrowseInformationFile="$(IntDir)/"
-				WarningLevel="3"
+				PrecompiledHeaderFile="$(IntDir)/$(ProjectName)/$(ProjectName).pch"
+				AssemblerListingLocation="$(IntDir)/$(ProjectName)/"
+				ObjectFile="$(IntDir)/$(ProjectName)/"
+				ProgramDataBaseFileName="$(IntDir)/$(ProjectName).pdb"
+				BrowseInformationFile="$(IntDir)/$(ProjectName)/"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="4"
 				CompileAs="0"/>
@@ -45,7 +49,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLibrarianTool"
-				OutputFile="./DebugDLL/idLib.lib"/>
+				OutputFile="$(IntDir)/$(ProjectName).lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -58,87 +62,41 @@
 				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 		<Configuration
-			Name="Release|Win32"
-			OutputDirectory="idLib/ReleaseDLL"
-			IntermediateDirectory="idLib/ReleaseDLL"
+			Name="DebugInline|Win32"
+			OutputDirectory="../$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="$(OutDir)"
 			ConfigurationType="4"
-			CharacterSet="2">
-			<Tool
-				Name="VCCLCompilerTool"
-				Optimization="2"
-				GlobalOptimizations="TRUE"
-				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="1"
-				OmitFramePointers="TRUE"
-				OptimizeForProcessor="2"
-				AdditionalIncludeDirectories="mssdk/include"
-				PreprocessorDefinitions="_D3SDK,__DOOM__,__IDLIB__,WIN32,NDEBUG,_WINDOWS"
-				StringPooling="TRUE"
-				RuntimeLibrary="4"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
-				UsePrecompiledHeader="3"
-				PrecompiledHeaderThrough=""
-				PrecompiledHeaderFile="$(IntDir)/idLib.pch"
-				AssemblerListingLocation="$(IntDir)/"
-				ObjectFile="$(IntDir)/"
-				ProgramDataBaseFileName="$(IntDir)/"
-				BrowseInformation="0"
-				BrowseInformationFile="$(IntDir)/"
-				WarningLevel="3"
-				Detect64BitPortabilityProblems="FALSE"
-				DebugInformationFormat="3"
-				CompileAs="0"/>
-			<Tool
-				Name="VCCustomBuildTool"/>
-			<Tool
-				Name="VCLibrarianTool"
-				OutputFile="./ReleaseDLL/idLib.lib"/>
-			<Tool
-				Name="VCMIDLTool"/>
-			<Tool
-				Name="VCPostBuildEventTool"/>
-			<Tool
-				Name="VCPreBuildEventTool"/>
-			<Tool
-				Name="VCPreLinkEventTool"/>
-			<Tool
-				Name="VCResourceCompilerTool"/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
-		</Configuration>
-		<Configuration
-			Name="Debug with inlines|Win32"
-			OutputDirectory="idLib/InlineDebugDLL"
-			IntermediateDirectory="idLib/InlineDebugDLL"
-			ConfigurationType="4"
+			UseOfMFC="0"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="mssdk/include"
-				PreprocessorDefinitions="_D3SDK,__DOOM__,__IDLIB__,WIN32,_DEBUG,_WINDOWS,_INLINEDEBUG"
+				PreprocessorDefinitions="_DEBUG,_WINDOWS,_INLINEDEBUG,Q4SDK"
 				MinimalRebuild="FALSE"
-				BasicRuntimeChecks="0"
-				RuntimeLibrary="5"
-				BufferSecurityCheck="FALSE"
+				BasicRuntimeChecks="3"
+				RuntimeLibrary="1"
+				BufferSecurityCheck="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="3"
 				PrecompiledHeaderThrough=""
-				PrecompiledHeaderFile="$(IntDir)/idLib.pch"
-				AssemblerListingLocation="$(IntDir)/"
-				ObjectFile="$(IntDir)/"
-				ProgramDataBaseFileName="$(IntDir)/"
+				PrecompiledHeaderFile="$(IntDir)/$(ProjectName)/$(ProjectName).pch"
+				AssemblerListingLocation="$(IntDir)/$(ProjectName)/"
+				ObjectFile="$(IntDir)/$(ProjectName)/"
+				ProgramDataBaseFileName="$(IntDir)/$(ProjectName).pdb"
 				BrowseInformation="1"
-				BrowseInformationFile="$(IntDir)/"
-				WarningLevel="3"
+				BrowseInformationFile="$(IntDir)/$(ProjectName)/"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				CompileAs="0"/>
@@ -146,7 +104,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLibrarianTool"
-				OutputFile="./InlineDebugDLL/idLib.lib"/>
+				OutputFile="$(IntDir)/$(ProjectName).lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -160,34 +118,46 @@
 				ShowProgress="TRUE"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 		<Configuration
-			Name="Debug with inlines and memory log|Win32"
-			OutputDirectory="idLib/InlineDebugMemoryDLL"
-			IntermediateDirectory="idLib/InlineDebugMemoryDLL"
+			Name="Release|Win32"
+			OutputDirectory="../$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="$(OutDir)"
 			ConfigurationType="4"
+			UseOfMFC="0"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="0"
+				Optimization="3"
+				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="1"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="0"
+				OmitFramePointers="FALSE"
+				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="mssdk/include"
-				PreprocessorDefinitions="_D3SDK,__DOOM__,__IDLIB__,WIN32,_DEBUG,_WINDOWS,_INLINEDEBUG,ID_REDIRECT_NEWDELETE,ID_DEBUG_MEMORY,ID_DEBUG_UNINITIALIZED_MEMORY"
-				MinimalRebuild="FALSE"
-				BasicRuntimeChecks="0"
-				RuntimeLibrary="5"
+				PreprocessorDefinitions="NDEBUG,_WINDOWS,_FINAL,Q4SDK"
+				StringPooling="TRUE"
+				RuntimeLibrary="0"
 				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="FALSE"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="3"
 				PrecompiledHeaderThrough=""
-				PrecompiledHeaderFile="$(IntDir)/idLib.pch"
-				AssemblerListingLocation="$(IntDir)/"
-				ObjectFile="$(IntDir)/"
-				ProgramDataBaseFileName="$(IntDir)/"
-				BrowseInformation="1"
-				BrowseInformationFile="$(IntDir)/"
-				WarningLevel="3"
+				PrecompiledHeaderFile="$(IntDir)/$(ProjectName)/$(ProjectName).pch"
+				AssemblerListingLocation="$(IntDir)/$(ProjectName)/"
+				ObjectFile="$(IntDir)/$(ProjectName)/"
+				ProgramDataBaseFileName="$(IntDir)/$(ProjectName).pdb"
+				BrowseInformation="0"
+				BrowseInformationFile="$(IntDir)/$(ProjectName)/"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				CompileAs="0"/>
@@ -195,7 +165,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLibrarianTool"
-				OutputFile="./InlineDebugMemoryDLL/idLib.lib"/>
+				OutputFile="$(IntDir)/$(ProjectName).lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -208,37 +178,42 @@
 				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 	</Configurations>
+	<References>
+	</References>
 	<Files>
 		<Filter
 			Name="idLib"
 			Filter="">
+			<File
+				RelativePath="idlib\AutoPtr.h">
+			</File>
 			<File
 				RelativePath="idlib\Base64.cpp">
 				<FileConfiguration
 					Name="Debug|Win32">
 					<Tool
 						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"/>
+						UsePrecompiledHeader="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="DebugInline|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="3"/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|Win32">
 					<Tool
 						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug with inlines|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug with inlines and memory log|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"/>
+						UsePrecompiledHeader="3"/>
 				</FileConfiguration>
 			</File>
 			<File
@@ -269,10 +244,10 @@
 				RelativePath="idlib\Heap.h">
 			</File>
 			<File
-				RelativePath="idlib\LangDict.cpp">
+				RelativePath=".\idlib\LangDict.cpp">
 			</File>
 			<File
-				RelativePath="idlib\LangDict.h">
+				RelativePath=".\idlib\LangDict.h">
 			</File>
 			<File
 				RelativePath="idlib\Lexer.cpp">
@@ -281,13 +256,37 @@
 				RelativePath="idlib\Lexer.h">
 			</File>
 			<File
-				RelativePath="idlib\Lib.cpp">
+				RelativePath="idlib\LexerFactory.cpp">
 			</File>
 			<File
-				RelativePath="idlib\Lib.h">
+				RelativePath="idlib\LexerFactory.h">
 			</File>
 			<File
-				RelativePath="idlib\MapFile.cpp">
+				RelativePath=".\idlib\Lib.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="DebugInline|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\idlib\Lib.h">
+			</File>
+			<File
+				RelativePath="idlib\mapfile.cpp">
 			</File>
 			<File
 				RelativePath="idlib\MapFile.h">
@@ -299,10 +298,55 @@
 				RelativePath="idlib\Parser.h">
 			</File>
 			<File
+				RelativePath="idlib\precompiled.h">
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="TRUE">
+					<Tool
+						Name="VCCustomBuildTool"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="DebugInline|Win32"
+					ExcludedFromBuild="TRUE">
+					<Tool
+						Name="VCCustomBuildTool"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="TRUE">
+					<Tool
+						Name="VCCustomBuildTool"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\idlib\rvHeap.cpp">
+			</File>
+			<File
+				RelativePath=".\idlib\rvHeap.h">
+			</File>
+			<File
+				RelativePath=".\idlib\rvHeapArena.cpp">
+			</File>
+			<File
+				RelativePath=".\idlib\rvHeapArena.h">
+			</File>
+			<File
+				RelativePath=".\idlib\rvMemSys.cpp">
+			</File>
+			<File
+				RelativePath=".\idlib\rvMemSys.h">
+			</File>
+			<File
 				RelativePath="idlib\Str.cpp">
 			</File>
 			<File
 				RelativePath="idlib\Str.h">
+			</File>
+			<File
+				RelativePath="idlib\TextCompiler.cpp">
+			</File>
+			<File
+				RelativePath="idlib\TextCompiler.h">
 			</File>
 			<File
 				RelativePath="idlib\Timer.cpp">
@@ -311,13 +355,16 @@
 				RelativePath="idlib\Timer.h">
 			</File>
 			<File
+				RelativePath=".\idlib\TimingCollection.cpp">
+			</File>
+			<File
+				RelativePath=".\idlib\TimingCollection.h">
+			</File>
+			<File
 				RelativePath="idlib\Token.cpp">
 			</File>
 			<File
 				RelativePath="idlib\Token.h">
-			</File>
-			<File
-				RelativePath="idlib\precompiled.h">
 			</File>
 			<Filter
 				Name="BV"
@@ -351,10 +398,10 @@
 				Name="Containers"
 				Filter="">
 				<File
-					RelativePath="idlib\containers\BTree.h">
+					RelativePath="idlib\containers\BinSearch.h">
 				</File>
 				<File
-					RelativePath="idlib\containers\BinSearch.h">
+					RelativePath=".\idlib\BTree.h">
 				</File>
 				<File
 					RelativePath="idlib\containers\HashIndex.cpp">
@@ -375,10 +422,16 @@
 					RelativePath="idlib\containers\List.h">
 				</File>
 				<File
+					RelativePath=".\idlib\containers\Pair.h">
+				</File>
+				<File
 					RelativePath="idlib\containers\PlaneSet.h">
 				</File>
 				<File
 					RelativePath="idlib\containers\Queue.h">
+				</File>
+				<File
+					RelativePath=".\idlib\containers\rvBlockPool.h">
 				</File>
 				<File
 					RelativePath="idlib\containers\Stack.h">
@@ -400,16 +453,16 @@
 				Name="Geometry"
 				Filter="">
 				<File
-					RelativePath="idlib\geometry\DrawVert.cpp">
-				</File>
-				<File
 					RelativePath="idlib\geometry\DrawVert.h">
 				</File>
 				<File
-					RelativePath="idlib\geometry\JointTransform.cpp">
+					RelativePath=".\idlib\geometry\JointTransform.cpp">
 				</File>
 				<File
-					RelativePath="idlib\geometry\JointTransform.h">
+					RelativePath=".\idlib\geometry\JointTransform.h">
+				</File>
+				<File
+					RelativePath=".\idlib\geometry\rvVertex.h">
 				</File>
 				<File
 					RelativePath="idlib\geometry\Surface.cpp">
@@ -424,10 +477,10 @@
 					RelativePath="idlib\geometry\Surface_Patch.h">
 				</File>
 				<File
-					RelativePath="idlib\geometry\Surface_Polytope.cpp">
+					RelativePath=".\idlib\geometry\Surface_Polytope.cpp">
 				</File>
 				<File
-					RelativePath="idlib\geometry\Surface_Polytope.h">
+					RelativePath=".\idlib\geometry\Surface_Polytope.h">
 				</File>
 				<File
 					RelativePath="idlib\geometry\Surface_SweptSpline.cpp">
@@ -455,46 +508,6 @@
 				</File>
 			</Filter>
 			<Filter
-				Name="Hashing"
-				Filter="">
-				<File
-					RelativePath="idlib\hashing\CRC16.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\CRC16.h">
-				</File>
-				<File
-					RelativePath="idlib\hashing\CRC32.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\CRC32.h">
-				</File>
-				<File
-					RelativePath="idlib\hashing\CRC8.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\CRC8.h">
-				</File>
-				<File
-					RelativePath="idlib\hashing\Honeyman.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\Honeyman.h">
-				</File>
-				<File
-					RelativePath="idlib\hashing\MD4.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\MD4.h">
-				</File>
-				<File
-					RelativePath="idlib\hashing\MD5.cpp">
-				</File>
-				<File
-					RelativePath="idlib\hashing\MD5.h">
-				</File>
-			</Filter>
-			<Filter
 				Name="Math"
 				Filter="">
 				<File
@@ -504,16 +517,22 @@
 					RelativePath="idlib\math\Angles.h">
 				</File>
 				<File
-					RelativePath="idlib\math\Complex.cpp">
+					RelativePath=".\idlib\math\Complex.cpp">
 				</File>
 				<File
-					RelativePath="idlib\math\Complex.h">
+					RelativePath=".\idlib\math\Complex.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Curve.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Extrapolate.h">
+				</File>
+				<File
+					RelativePath=".\idlib\math\FFT.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\math\FFT.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Interpolate.h">
@@ -555,16 +574,22 @@
 					RelativePath="idlib\math\Pluecker.h">
 				</File>
 				<File
-					RelativePath="idlib\math\Polynomial.cpp">
+					RelativePath=".\idlib\math\Polynomial.cpp">
 				</File>
 				<File
-					RelativePath="idlib\math\Polynomial.h">
+					RelativePath=".\idlib\math\Polynomial.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Quat.cpp">
 				</File>
 				<File
 					RelativePath="idlib\math\Quat.h">
+				</File>
+				<File
+					RelativePath=".\idlib\math\Radians.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\math\Radians.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Random.h">
@@ -588,40 +613,13 @@
 					RelativePath="idlib\math\Simd_3DNow.h">
 				</File>
 				<File
-					RelativePath="idlib\math\Simd_AltiVec.cpp">
-					<FileConfiguration
-						Name="Debug|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug with inlines|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug with inlines and memory log|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-				</File>
-				<File
-					RelativePath="idlib\math\Simd_AltiVec.h">
-				</File>
-				<File
-					RelativePath="idlib\math\Simd_Generic.cpp">
+					RelativePath="idlib\math\Simd_generic.cpp">
 				</File>
 				<File
 					RelativePath="idlib\math\Simd_Generic.h">
+				</File>
+				<File
+					RelativePath=".\idlib\math\Simd_InstructionMacros.h">
 				</File>
 				<File
 					RelativePath="idlib\math\Simd_MMX.cpp">
@@ -652,6 +650,60 @@
 				</File>
 				<File
 					RelativePath="idlib\math\Vector.h">
+				</File>
+			</Filter>
+			<Filter
+				Name="Hashing"
+				Filter="">
+				<File
+					RelativePath=".\idlib\hashing\CRC16.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\CRC16.h">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\CRC32.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\CRC32.h">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\CRC8.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\CRC8.h">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\Honeyman.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\Honeyman.h">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\MD4.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\MD4.h">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\MD5.cpp">
+				</File>
+				<File
+					RelativePath=".\idlib\hashing\MD5.h">
+				</File>
+			</Filter>
+			<Filter
+				Name="threads"
+				Filter="">
+				<File
+					RelativePath=".\idlib\threads\AutoCrit.h">
+				</File>
+			</Filter>
+			<Filter
+				Name="Algorithms"
+				Filter="">
+				<File
+					RelativePath=".\idlib\algorithms\MultifieldSort.h">
 				</File>
 			</Filter>
 		</Filter>

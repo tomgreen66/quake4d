@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __CMDARGS_H__
 #define __CMDARGS_H__

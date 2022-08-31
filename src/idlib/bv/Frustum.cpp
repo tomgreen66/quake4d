@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #include "../precompiled.h"
 #pragma hdrstop
@@ -99,7 +97,7 @@ bool idFrustum::CullPoint( const idVec3 &point ) const {
 	// transform point to frustum space
 	p = ( point - origin ) * axis.Transpose();
 	// test whether or not the point is within the frustum
-	if ( p.x < dNear || p.x > dFar ) {
+	if ( p.x < dNear || p.y > dFar ) {
 		return true;
 	}
 	scale = p.x * invFar;
@@ -2019,8 +2017,6 @@ bool idFrustum::ProjectionBounds( const idBounds &bounds, idBounds &projectionBo
 	return ProjectionBounds( idBox( bounds, vec3_origin, mat3_identity ), projectionBounds );
 }
 
-#ifndef __linux__
-
 /*
 ============
 idFrustum::ProjectionBounds
@@ -2046,7 +2042,6 @@ bool idFrustum::ProjectionBounds( const idBox &box, idBounds &projectionBounds )
 		projectionBounds[1].x = boxMax - base;
 		projectionBounds[0].y = projectionBounds[0].z = -1.0f;
 		projectionBounds[1].y = projectionBounds[1].z = 1.0f;
-
 		return true;
 	}
 
@@ -2134,8 +2129,6 @@ bool idFrustum::ProjectionBounds( const idBox &box, idBounds &projectionBounds )
 	return true;
 }
 
-#endif
-
 /*
 ============
 idFrustum::ProjectionBounds
@@ -2163,6 +2156,8 @@ bool idFrustum::ProjectionBounds( const idSphere &sphere, idBounds &projectionBo
 	if ( ( d * d ) > rs * ( sFar + dUp * dUp ) ) {
 		return false;
 	}
+
+	// FIXME: implement
 
 	// bounds that cover the whole frustum
 	projectionBounds[0].x = 0.0f;
@@ -2405,26 +2400,39 @@ void idFrustum::ClipFrustumToBox( const idBox &box, float clipFractions[4], int 
 	minf = ( dNear + 1.0f ) * invFar;
 
 	for ( i = 0; i < 4; i++ ) {
+// RAVEN BEGIN
+// jscott: made safe
+		clipFractions[i] = MAX_WORLD_COORD;
+		clipPlanes[i] = 1;
 
-		index = FLOATSIGNBITNOTSET( cornerVecs[i].x );
-		f = ( bounds[index].x - localOrigin.x ) / cornerVecs[i].x;
-		clipFractions[i] = f;
-		clipPlanes[i] = 1 << index;
+		if( cornerVecs[i].x != 0.0f ) {
 
-		index = FLOATSIGNBITNOTSET( cornerVecs[i].y );
-		f = ( bounds[index].y - localOrigin.y ) / cornerVecs[i].y;
-		if ( f < clipFractions[i] ) {
+			index = FLOATSIGNBITNOTSET( cornerVecs[i].x );
+			f = ( bounds[index].x - localOrigin.x ) / cornerVecs[i].x;
 			clipFractions[i] = f;
-			clipPlanes[i] = 4 << index;
+			clipPlanes[i] = 1 << index;
 		}
 
-		index = FLOATSIGNBITNOTSET( cornerVecs[i].z );
-		f = ( bounds[index].z - localOrigin.z ) / cornerVecs[i].z;
-		if ( f < clipFractions[i] ) {
-			clipFractions[i] = f;
-			clipPlanes[i] = 16 << index;
+		if( cornerVecs[i].y != 0.0f ) {
+
+			index = FLOATSIGNBITNOTSET( cornerVecs[i].y );
+			f = ( bounds[index].y - localOrigin.y ) / cornerVecs[i].y;
+			if ( f < clipFractions[i] ) {
+				clipFractions[i] = f;
+				clipPlanes[i] = 4 << index;
+			}
 		}
 
+		if( cornerVecs[i].z != 0.0f ) {
+
+			index = FLOATSIGNBITNOTSET( cornerVecs[i].z );
+			f = ( bounds[index].z - localOrigin.z ) / cornerVecs[i].z;
+			if ( f < clipFractions[i] ) {
+				clipFractions[i] = f;
+				clipPlanes[i] = 16 << index;
+			}
+		}
+// RAVEN END
 		// make sure the frustum is not clipped between the frustum origin and the near plane
 		if ( clipFractions[i] < minf ) {
 			clipFractions[i] = minf;

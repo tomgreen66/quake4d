@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #include "../idlib/precompiled.h"
 #pragma hdrstop
@@ -403,7 +401,10 @@ void idPVS::PassagePVS( void ) const {
 	for ( i = 0; i < numPortals; i++ ) {
 		source = &pvsPortals[i];
 		memset( source->vis, 0, portalVisBytes );
-		memcpy( stack->mightSee, source->mightSee, portalVisBytes );
+// RAVEN BEGIN
+// JSinger: Changed to call optimized memcpy
+		SIMDProcessor->Memcpy( stack->mightSee, source->mightSee, portalVisBytes );
+// RAVEN END
 		FloodPassagePVS_r( source, source, stack );
 		source->done = true;
 	}
@@ -694,7 +695,10 @@ void idPVS::CopyPortalPVSToMightSee( void ) const {
 
 	for ( i = 0; i < numPortals; i++ ) {
 		p = &pvsPortals[i];
-		memcpy( p->mightSee, p->vis, portalVisBytes );
+// RAVEN BEGIN
+// JSinger: Changed to call optimized memcpy
+		SIMDProcessor->Memcpy( p->mightSee, p->vis, portalVisBytes );
+// RAVEN BEGIN
 	}
 }
 
@@ -783,7 +787,6 @@ void idPVS::Init( void ) {
 
 	areaVisBytes = ( ((numAreas+31)&~31) >> 3);
 	areaVisLongs = areaVisBytes/sizeof(long);
-
 	areaPVS = new byte[numAreas * areaVisBytes];
 	memset( areaPVS, 0xFF, numAreas * areaVisBytes );
 
@@ -816,10 +819,36 @@ void idPVS::Init( void ) {
 
 	timer.Stop();
 
+#if 0
+	// bkreimeier20060123 - per MrE's recommendation, used this in Wolf
+	// if the PVS is not relexive for (i,j), we assume floating point errors
+	//  and assume a false positive - remove either from either
+	for ( int i=0; i<numAreas; i++ ) {
+		byte* const pvs_i = areaPVS + i * areaVisBytes;
+
+		for ( int j=0; j<numAreas; j++ ) {
+			byte* const pvs_j = areaPVS + j * areaVisBytes;
+			const bool j_in_i = (pvs_i[j>>3] & (1<<(j&7)));
+			const bool i_in_j = (pvs_j[i>>3] & (1<<(i&7)));
+			if ( i_in_j!=j_in_i ) {
+				pvs_i[j>>3] &= ~(1 << (j&7));
+				pvs_j[i>>3] &= ~(1 << (i&7));
+			}
+		}
+	}
+#endif
+
 	gameLocal.Printf( "%5.0f msec to calculate PVS\n", timer.Milliseconds() );
 	gameLocal.Printf( "%5d areas\n", numAreas );
 	gameLocal.Printf( "%5d portals\n", numPortals );
-	gameLocal.Printf( "%5d areas visible on average\n", totalVisibleAreas / numAreas );
+
+// RAVEN BEGIN
+// rjohnson: fix for div by 0
+	if( numAreas ) {
+		gameLocal.Printf( "%5d areas visible on average\n", totalVisibleAreas / numAreas );
+	}
+// RAVEN END
+
 	if ( numAreas * areaVisBytes < 1024 ) {
 		gameLocal.Printf( "%5d bytes PVS data\n", numAreas * areaVisBytes );
 	}
@@ -848,7 +877,14 @@ void idPVS::Shutdown( void ) {
 	}
 	if ( currentPVS ) {
 		for ( int i = 0; i < MAX_CURRENT_PVS; i++ ) {
-			delete currentPVS[i].pvs;
+// RAVEN BEGIN
+// jsinger: modified to check to make sure the pointers have a value before attempting to delete
+//          them.  This prevents a call through the unified allocator before it has been initialized
+			if(currentPVS[i].pvs)
+			{
+				delete currentPVS[i].pvs;
+			}
+// RAVEN END
 			currentPVS[i].pvs = NULL;
 		}
 	}
@@ -958,7 +994,10 @@ pvsHandle_t idPVS::SetupCurrentPVS( const int sourceArea, const pvsType_t type )
 	}
 
 	if ( type != PVS_CONNECTED_AREAS ) {
-		memcpy( currentPVS[handle.i].pvs, areaPVS + sourceArea * areaVisBytes, areaVisBytes );
+// RAVEN BEGIN
+// JSinger: Changed to call optimized memcpy
+		SIMDProcessor->Memcpy( currentPVS[handle.i].pvs, areaPVS + sourceArea * areaVisBytes, areaVisBytes );
+// RAVEN END
 	} else {
 		memset( currentPVS[handle.i].pvs, -1, areaVisBytes );
 	}
@@ -1004,7 +1043,10 @@ pvsHandle_t idPVS::SetupCurrentPVS( const int *sourceAreas, const int numSourceA
 
 	if ( type != PVS_CONNECTED_AREAS ) {
 		// merge PVS of all areas the source is in
-		memcpy( currentPVS[handle.i].pvs, areaPVS + sourceAreas[0] * areaVisBytes, areaVisBytes );
+// RAVEN BEGIN
+// JSinger: Changed to call optimized memcpy
+		SIMDProcessor->Memcpy( currentPVS[handle.i].pvs, areaPVS + sourceAreas[0] * areaVisBytes, areaVisBytes );
+// RAVEN END
 		for ( i = 1; i < numSourceAreas; i++ ) {
 
 			assert( sourceAreas[i] >= 0 && sourceAreas[i] < numAreas );

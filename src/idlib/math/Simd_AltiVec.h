@@ -17,8 +17,10 @@
 // Turns on/off the simple math routines (add, sub, div, etc)
 #define ENABLE_SIMPLE_MATH	
 
+// Disable dot routines since they introduce artifacts with the shadows. I can't measure
+// a performance improvement with sampling tools with DOT enabled, so disable for now
 // Turns on/off the dot routines
-#define ENABLE_DOT
+//#define ENABLE_DOT
 
 // Turns on/off the compare routines
 #define ENABLE_COMPARES
@@ -32,8 +34,9 @@
 // Turns on/off Clamp routines
 #define ENABLE_CLAMP
 
+// Disabling because members of idAFConstraint aren't aligned properly
 // Turns on/off XXX16 routines
-#define ENABLE_16ROUTINES
+//#define ENABLE_16ROUTINES
 
 // Turns on/off LowerTriangularSolve, LowerTriangularSolveTranspose, and MatX_LDLTFactor
 #define ENABLE_LOWER_TRIANGULAR
@@ -56,11 +59,15 @@
 // Turns on/off the stuff that isn't on elsewhere
 // Currently: BlendJoints, TransformJoints, UntransformJoints, ConvertJointQuatsToJointMats, and
 // ConvertJointMatsToJointQuats
-#define LIVE_VICARIOUSLY
+//#define LIVE_VICARIOUSLY
 
-// This assumes that the dest (and mixBuffer) array to the sound functions is aligned. If this is not true, we take a large
+// This assumes that the dest array to the sound functions is aligned. If this is not true, we take a large
 // performance hit from having to do unaligned stores
 //#define SOUND_DEST_ALIGNED
+
+// This assumes that the finalMixBuffer array to the sound functions is aligned. If this is not true, we take a large
+// performance hit from having to do unaligned stores
+//#define SOUND_MIX_ALIGNED
 
 // This assumes that the vertexCache array to CreateShadowCache and CreateVertexProgramShadowCache is aligned. If it's not,
 // then we take a big performance hit from unaligned stores.
@@ -74,11 +81,8 @@
 // then we don't get any speedup
 //#define DERIVE_UNSMOOTH_DRAWVERT_ALIGNED
 
-// Disable DRAWVERT_PADDED since we disabled the ENABLE_CULL optimizations and the default
-// implementation does not allow for the extra padding.
-// This assumes that idDrawVert has been padded by 4 bytes so that xyz always starts at an aligned
-// address
-//#define DRAWVERT_PADDED
+// The QuakeIV definition of idDrawVert is 64 bytes, so enable this optimization
+#define DRAWVERT_PADDED
 
 class idSIMD_AltiVec : public idSIMD_Generic {
 #if defined(MACOS_X) && defined(__ppc__)
@@ -174,7 +178,11 @@ public:
 #ifdef ENABLE_LOWER_TRIANGULAR
 	virtual void VPCALL MatX_LowerTriangularSolve( const idMatX &L, float *x, const float *b, const int n, int skip = 0 );
 	virtual void VPCALL MatX_LowerTriangularSolveTranspose( const idMatX &L, float *x, const float *b, const int n );
+#if __GNUC__ >= 4
 	virtual bool VPCALL MatX_LDLTFactor( idMatX &mat, idVecX &invDiag, const int n );
+#else
+	virtual unsigned char VPCALL MatX_LDLTFactor( idMatX &mat, idVecX &invDiag, const int n );
+#endif
 #endif
 #ifdef LIVE_VICARIOUSLY
 	virtual void VPCALL BlendJoints( idJointQuat *joints, const idJointQuat *blendJoints, const float lerp, const int *index, const int numJoints );
@@ -185,7 +193,6 @@ public:
 #ifdef LIVE_VICARIOUSLY
 	virtual void VPCALL TransformJoints( idJointMat *jointMats, const int *parents, const int firstJoint, const int lastJoint );
 	virtual void VPCALL UntransformJoints( idJointMat *jointMats, const int *parents, const int firstJoint, const int lastJoint );
-	virtual void VPCALL TransformVerts( idDrawVert *verts, const int numVerts, const idJointMat *joints, const idVec4 *weights, const int *index, const int numWeights );
 #endif
 
 #ifdef ENABLE_CULL

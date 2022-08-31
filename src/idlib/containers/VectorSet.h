@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __VECTORSET_H__
 #define __VECTORSET_H__
@@ -122,9 +120,9 @@ ID_INLINE int idVectorSet<type,dimension>::FindVector( const type &v, const floa
 		hashKey += (int) ( ( v[i] - mins[i] ) * boxInvSize[i] );
 	}
 
-	hash.Add( hashKey, Num() );
+	hash.Add( hashKey, idList<type>::Num() );
 	Append( v );
-	return Num()-1;
+	return idList<type>::Num()-1;
 }
 
 

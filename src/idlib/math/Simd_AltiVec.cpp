@@ -5,13 +5,18 @@
 #include "../precompiled.h"
 #pragma hdrstop
 
-#include "Simd_Generic.h"
+#include "Simd_generic.h"
 #include "Simd_AltiVec.h"
-#include <math.h>
 #include <float.h>
+
+#if defined(MACOS_X) && defined(__ppc__)
 
 #ifdef PPC_INTRINSICS
 	#include <ppc_intrinsics.h>
+#endif
+
+#if defined(bool) && __GNUC__ < 4
+	#undef bool
 #endif
 
 // Doom3 SIMD Library version 0.5
@@ -26,17 +31,10 @@
 //
 //===============================================================
 
-#if defined(MACOS_X) && defined(__ppc__)
-
 // Data struct sizes
 
-#ifndef DRAWVERT_PADDED
-	// 60 bytes, 15 floats at 4 bytes each
-	#define DRAWVERT_OFFSET 15
-#else
-	// 64 bytes, 16 floats
-	#define DRAWVERT_OFFSET 16
-#endif
+// 64 bytes
+#define DRAWVERT_OFFSET 16
 // 16 bytes each, 4 floats
 #define PLANE_OFFSET 4
 // 16 bytes each, 4 floats
@@ -233,6 +231,7 @@
 	vec_st( ULStoreVal8, 111, ADDR );		\
 	vec_st( ULStoreVal9, 127, ADDR );		\
 	vec_st( ULStoreVal10, 143, ADDR );	}
+
 
 /*
 ============
@@ -1516,7 +1515,7 @@ idSIMD_AltiVec::Dot
 void VPCALL idSIMD_AltiVec::Dot( float *dst, const idVec3 &constant, const idDrawVert *src, const int count ) {
 //#define OPER(X) dst[(X)] = constant * src[(X)].xyz;
 		
-		// idDrawVert size is 60 bytes
+		// idDrawVert size
 		assert( sizeof(idDrawVert) == DRAWVERT_OFFSET * sizeof( float ) );
 	
 		register vector float v0, v1, v2, v3, v4, v5, v6, v7;
@@ -1603,7 +1602,7 @@ idSIMD_AltiVec::Dot
 void VPCALL idSIMD_AltiVec::Dot( float *dst, const idVec3 &constant, const idDrawVert *src, const int count ) {
 //#define OPER(X) dst[(X)] = constant * src[(X)].xyz;
 		
-		// idDrawVert size is 64 bytes
+		// idDrawVert size
 		assert( sizeof(idDrawVert) == DRAWVERT_OFFSET * sizeof( float ) );
 	
 		register vector float v0, v1, v2, v3, v4, v5, v6, v7;
@@ -1912,7 +1911,7 @@ idSIMD_AltiVec::Dot
 void VPCALL idSIMD_AltiVec::Dot( float *dst, const idPlane &constant, const idDrawVert *src, const int count ) {
 //#define OPER(X) dst[(X)] = constant.Normal() * src[(X)].xyz + constant[3];
 		
-	// idDrawVert size is 60 bytes
+	// idDrawVert size
 	assert( sizeof(idDrawVert) == DRAWVERT_OFFSET * sizeof( float ) );
 					
 	int i;
@@ -2021,7 +2020,7 @@ idSIMD_AltiVec::Dot
 void VPCALL idSIMD_AltiVec::Dot( float *dst, const idPlane &constant, const idDrawVert *src, const int count ) {
 //#define OPER(X) dst[(X)] = constant.Normal() * src[(X)].xyz + constant[3];
 		
-	// idDrawVert size is 60 bytes
+	// idDrawVert size
 	assert( sizeof(idDrawVert) == DRAWVERT_OFFSET * sizeof( float ) );
 					
 	int i;
@@ -4504,7 +4503,11 @@ void VPCALL idSIMD_AltiVec::MatX_LowerTriangularSolveTranspose( const idMatX &L,
 idSIMD_AltiVec::MatX_LDLTFactor
 ============
 */
+#if __GNUC__ >= 4
 bool VPCALL idSIMD_AltiVec::MatX_LDLTFactor( idMatX &mat, idVecX &invDiag, const int n ) {
+#else
+unsigned char VPCALL idSIMD_AltiVec::MatX_LDLTFactor( idMatX &mat, idVecX &invDiag, const int n ) {
+#endif
 	int i, j, k, nc;
 	float *v, *diag, *mptr;
 	float s0, s1, s2, s3, sum, d;
@@ -5370,64 +5373,6 @@ void VPCALL idSIMD_AltiVec::UntransformJoints( idJointMat *jointMats, const int 
 #endif
 }
 
-/*
-============
-idSIMD_AltiVec::TransformVerts
-============
-*/
-
-// Here we don't have much for the vector unit to do, and the gain we get from doing the math
-// in parallel is eaten by doing unaligned stores. 
-void VPCALL idSIMD_AltiVec::TransformVerts( idDrawVert *verts, const int numVerts, const idJointMat *joints, const idVec4 *weights, const int *index, int numWeights ) {
-	int i, j;
-	const byte *jointsPtr = (byte *)joints;
-
-	for( j = i = 0; i < numVerts; i++ ) {
-		idVec3 v;
-
-		float *matPtrOrig = ( *(idJointMat *)( jointsPtr + index[j*2] ) ).ToFloatPtr();
-		float *weightPtr = (float*) weights[j].ToFloatPtr();
-		
-		v[0] = matPtrOrig[0] * weightPtr[0];
-		v[0] += matPtrOrig[1] * weightPtr[1];
-		v[0] += matPtrOrig[2] * weightPtr[2];
-		v[0] += matPtrOrig[3] * weightPtr[3];
-
-		v[1] = matPtrOrig[4] * weightPtr[0];
-		v[1] += matPtrOrig[5] * weightPtr[1];
-		v[1] += matPtrOrig[6] * weightPtr[2];
-		v[1] += matPtrOrig[7] * weightPtr[3];
-			
-		v[2] = matPtrOrig[8] * weightPtr[0];
-		v[2] += matPtrOrig[9] * weightPtr[1];
-		v[2] += matPtrOrig[10] * weightPtr[2];
-		v[2] += matPtrOrig[11] * weightPtr[3];
-
-		while( index[j*2+1] == 0 ) {
-			j++;
-			float *matPtr = ( *(idJointMat *)( jointsPtr + index[j*2] ) ).ToFloatPtr();
-			weightPtr = (float*) weights[j].ToFloatPtr();
-		
-			v[0] += matPtr[0] * weightPtr[0];
-			v[0] += matPtr[1] * weightPtr[1];
-			v[0] += matPtr[2] * weightPtr[2];
-			v[0] += matPtr[3] * weightPtr[3];
-			
-			v[1] += matPtr[4] * weightPtr[0];
-			v[1] += matPtr[5] * weightPtr[1];
-			v[1] += matPtr[6] * weightPtr[2];
-			v[1] += matPtr[7] * weightPtr[3];
-			
-			v[2] += matPtr[8] * weightPtr[0];
-			v[2] += matPtr[9] * weightPtr[1];
-			v[2] += matPtr[10] * weightPtr[2];
-			v[2] += matPtr[11] * weightPtr[3];
-		}
-		j++;
-
-		verts[i].xyz = v;
-	}
-}
 #endif /* LIVE_VICARIOUSLY */
 
 #ifdef ENABLE_CULL
@@ -10168,7 +10113,7 @@ void idSIMD_AltiVec::UpSampleOGGTo44kHz( float *dest, const float * const *ogg, 
 }
 #endif /* SOUND_DEST_ALIGNED */
 
-#ifdef SOUND_DEST_ALIGNED
+#ifdef SOUND_MIX_ALIGNED
 /*
 ============
 idSIMD_AltiVec::MixSoundTwoSpeakerMono
@@ -10388,9 +10333,9 @@ void VPCALL idSIMD_AltiVec::MixSoundTwoSpeakerMono( float *mixBuffer, const floa
 	}
 }
 
-#endif /* SOUND_DEST_ALIGNED */
+#endif /* SOUND_MIX_ALIGNED */
 
-#ifdef SOUND_DEST_ALIGNED
+#ifdef SOUND_MIX_ALIGNED
 /*
 ============
 idSIMD_AltiVec::MixSoundTwoSpeakerStereo
@@ -10593,7 +10538,7 @@ void VPCALL idSIMD_AltiVec::MixSoundTwoSpeakerStereo( float *mixBuffer, const fl
 
 #endif /* SOUND_DEST_ALIGNED */
 
-#ifdef SOUND_DEST_ALIGNED
+#ifdef SOUND_MIX_ALIGNED
 /*
 ============
 idSIMD_AltiVec::MixSoundSixSpeakerMono
@@ -10881,9 +10826,9 @@ void VPCALL idSIMD_AltiVec::MixSoundSixSpeakerMono( float *mixBuffer, const floa
 	}	
 }
 
-#endif /* SOUND_DEST_ALIGNED */
+#endif /* SOUND_MIX_ALIGNED */
 
-#ifdef SOUND_DEST_ALIGNED
+#ifdef SOUND_MIX_ALIGNED
 /*
 ============
 idSIMD_AltiVec::MixSoundSixSpeakerStereo
@@ -11137,7 +11082,7 @@ void VPCALL idSIMD_AltiVec::MixSoundSixSpeakerStereo( float *mixBuffer, const fl
 	}
 }
 
-#endif
+#endif //SOUND_MIX_ALIGNED
 
 /*
 ============

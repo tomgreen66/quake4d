@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #ifndef __MATH_POLYNOMIAL_H__
 #define __MATH_POLYNOMIAL_H__
@@ -414,7 +412,6 @@ ID_INLINE idPolynomial idPolynomial::GetDerivative( void ) const {
 	for ( int i = 1; i <= degree; i++ ) {
 		n.coefficient[i-1] = i * coefficient[i];
 	}
-	return n;
 }
 
 ID_INLINE idPolynomial idPolynomial::GetAntiDerivative( void ) const {
@@ -428,7 +425,6 @@ ID_INLINE idPolynomial idPolynomial::GetAntiDerivative( void ) const {
 	for ( int i = 0; i <= degree; i++ ) {
 		n.coefficient[i+1] = coefficient[i] / ( i + 1 );
 	}
-	return n;
 }
 
 ID_INLINE int idPolynomial::GetRoots1( float a, float b, float *roots ) {
@@ -586,7 +582,9 @@ ID_INLINE float *idPolynomial::ToFloatPtr( void ) {
 ID_INLINE void idPolynomial::Resize( int d, bool keep ) {
 	int alloc = ( d + 1 + 3 ) & ~3;
 	if ( alloc > allocated ) {
-		float *ptr = (float *) Mem_Alloc16( alloc * sizeof( float ) );
+// RAVEN BEGIN
+		float *ptr = (float *) Mem_Alloc16( alloc * sizeof( float ), MA_MATH );
+// RAVEN END
 		if ( coefficient != NULL ) {
 			if ( keep ) {
 				for ( int i = 0; i <= degree; i++ ) {

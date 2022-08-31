@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #include "../idlib/precompiled.h"
 #pragma hdrstop
@@ -143,7 +141,6 @@ void idCmdArgs::TokenizeString( const char *text, bool keepAsStrings ) {
 		totalLen += len + 1;
 	}
 }
-
 /*
 ============
 idCmdArgs::AppendArg

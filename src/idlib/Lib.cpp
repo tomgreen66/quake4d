@@ -1,5 +1,3 @@
-// Copyright (C) 2004 Id Software, Inc.
-//
 
 #include "precompiled.h"
 #pragma hdrstop
@@ -31,13 +29,20 @@ idLib::Init
 */
 void idLib::Init( void ) {
 
-	assert( sizeof( bool ) == 1 );
-
 	// initialize little/big endian conversion
 	Swap_Init();
 
 	// initialize memory manager
 	Mem_Init();
+
+// RAVEN BEGIN
+// dluetscher: added the following code to initialize each of the memory heaps immediately
+//			   following Mem_Init()
+#ifdef _RV_MEM_SYS_SUPPORT
+	// initialize each of the memory heaps
+	common->InitHeaps();
+#endif
+// RAVEN END
 
 	// init string memory allocator
 	idStr::InitMemory();
@@ -48,11 +53,16 @@ void idLib::Init( void ) {
 	// initialize math
 	idMath::Init();
 
+// RAVEN BEGIN
+// jsinger: There is no reason for us to be doing this on the Xenon
+#ifndef _XENON
 	// test idMatX
 	//idMatX::Test();
 
 	// test idPolynomial
 	idPolynomial::Test();
+#endif
+// RAVEN END
 
 	// initialize the dictionary string pools
 	idDict::Init();
@@ -73,6 +83,15 @@ void idLib::ShutDown( void ) {
 
 	// shut down the SIMD engine
 	idSIMD::Shutdown();
+
+// RAVEN BEGIN
+// dluetscher: added the following code to shutdown each of the memory heaps immediately
+//			   before Mem_Shutdown()
+#ifdef _RV_MEM_SYS_SUPPORT
+	// shutdown each of the memory heaps
+	common->ShutdownHeaps();
+#endif
+// RAVEN END
 
 	// shut down the memory manager
 	Mem_Shutdown();
@@ -127,13 +146,14 @@ dword PackColor( const idVec4 &color ) {
 	dz = ColorFloatToByte( color.z );
 	dw = ColorFloatToByte( color.w );
 
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
+// RAVEN BEGIN
+// jnewquist: Big endian support
+#ifdef _LITTLE_ENDIAN
 	return ( dx << 0 ) | ( dy << 8 ) | ( dz << 16 ) | ( dw << 24 );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	return ( dx << 24 ) | ( dy << 16 ) | ( dz << 8 ) | ( dw << 0 );
 #else
-#error OS define is required!
+	return ( dx << 24 ) | ( dy << 16 ) | ( dz << 8 ) | ( dw << 0 );
 #endif
+// RAVEN END
 }
 
 /*
@@ -142,19 +162,20 @@ UnpackColor
 ================
 */
 void UnpackColor( const dword color, idVec4 &unpackedColor ) {
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
+// RAVEN BEGIN
+// jnewquist: Xenon is big endian
+#ifdef _LITTLE_ENDIAN
 	unpackedColor.Set( ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ), 
 						( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 24 ) & 255 ) * ( 1.0f / 255.0f ) );
-#elif (defined(MACOS_X) && defined(__ppc__))
+#else
 	unpackedColor.Set( ( ( color >> 24 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ), 
 						( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ) );
-#else
-#error OS define is required!
 #endif
+// RAVEN END
 }
 
 /*
@@ -169,13 +190,14 @@ dword PackColor( const idVec3 &color ) {
 	dy = ColorFloatToByte( color.y );
 	dz = ColorFloatToByte( color.z );
 
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
+// RAVEN BEGIN
+// jnewquist: Xenon is big endian
+#ifdef _LITTLE_ENDIAN
 	return ( dx << 0 ) | ( dy << 8 ) | ( dz << 16 );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	return ( dy << 16 ) | ( dz << 8 ) | ( dx << 0 );
 #else
-#error OS define is required!
+	return ( dy << 16 ) | ( dz << 8 ) | ( dx << 0 );
 #endif
+// RAVEN END
 }
 
 /*
@@ -184,17 +206,18 @@ UnpackColor
 ================
 */
 void UnpackColor( const dword color, idVec3 &unpackedColor ) {
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
+// RAVEN BEGIN
+// jnewquist: Xenon is big endian
+#ifdef _LITTLE_ENDIAN
 	unpackedColor.Set( ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ), 
 						( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ) );
-#elif (defined(MACOS_X) && defined(__ppc__))
+#else
 	unpackedColor.Set( ( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
 						( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ) );
-#else
-#error OS define is required!
 #endif
+// RAVEN END
 }
 
 /*
@@ -246,19 +269,35 @@ static float	(*_BigFloat)( float l );
 static float	(*_LittleFloat)( float l );
 static void		(*_BigRevBytes)( void *bp, int elsize, int elcount );
 static void		(*_LittleRevBytes)( void *bp, int elsize, int elcount );
-static void     (*_LittleBitField)( void *bp, int elsize );
 static void		(*_SixtetsForInt)( byte *out, int src );
 static int		(*_IntForSixtets)( byte *in );
 
+#ifdef _LITTLE_ENDIAN
+
+short	LittleShort( short l ) { return l; }
+int		LittleLong( int l ) { return l; }
+float	LittleFloat( float l ) { return l; }
+void	LittleRevBytes( void *bp, int elsize, int elcount ) {}
+
 short	BigShort( short l ) { return _BigShort( l ); }
-short	LittleShort( short l ) { return _LittleShort( l ); }
 int		BigLong( int l ) { return _BigLong( l ); }
-int		LittleLong( int l ) { return _LittleLong( l ); }
 float	BigFloat( float l ) { return _BigFloat( l ); }
-float	LittleFloat( float l ) { return _LittleFloat( l ); }
 void	BigRevBytes( void *bp, int elsize, int elcount ) { _BigRevBytes( bp, elsize, elcount ); }
-void	LittleRevBytes( void *bp, int elsize, int elcount ){ _LittleRevBytes( bp, elsize, elcount ); }
-void	LittleBitField( void *bp, int elsize ){ _LittleBitField( bp, elsize ); }
+
+#else
+
+short	LittleShort( short l ) { return _LittleShort( l ); }
+int		LittleLong( int l ) { return _LittleLong( l ); }
+float	LittleFloat( float l ) { return _LittleFloat( l ); }
+void	LittleRevBytes( void *bp, int elsize, int elcount ) { _LittleRevBytes( bp, elsize, elcount ); }
+
+short	BigShort( short l ) { return l; }
+int		BigLong( int l ) { return l; }
+float	BigFloat( float l ) { return l; }
+void	BigRevBytes( void *bp, int elsize, int elcount ) {}
+
+#endif
+
 
 void	SixtetsForInt( byte *out, int src) { _SixtetsForInt( out, src ); }
 int		IntForSixtets( byte *in ) { return _IntForSixtets( in ); }
@@ -385,52 +424,11 @@ void RevBytesSwap( void *bp, int elsize, int elcount ) {
 }
 
 /*
- =====================================================================
- RevBytesSwap
- 
- Reverses byte order in place, then reverses bits in those bytes
- 
- INPUTS
- bp       bitfield structure to reverse
- elsize   size of the underlying data type
- 
- RESULTS
- Reverses the bitfield of size elsize.
- ===================================================================== */
-void RevBitFieldSwap( void *bp, int elsize) {
-	int i;
-	unsigned char *p, t, v;
-	
-	LittleRevBytes( bp, elsize, 1 );
-	
-	p = (unsigned char *) bp;
-	while ( elsize-- ) {
-		v = *p;
-		t = 0;
-		for (i = 7; i; i--) {
-			t <<= 1;
-			v >>= 1;
-			t |= v & 1;
-		}
-		*p++ = t;
-	}
-}
-
-/*
 ================
 RevBytesNoSwap
 ================
 */
 void RevBytesNoSwap( void *bp, int elsize, int elcount ) {
-	return;
-}
-
-/*
- ================
- RevBytesNoSwap
- ================
- */
-void RevBitFieldNoSwap( void *bp, int elsize ) {
 	return;
 }
 
@@ -511,7 +509,6 @@ void Swap_Init( void ) {
 		_LittleFloat = FloatNoSwap;
 		_BigRevBytes = RevBytesSwap;
 		_LittleRevBytes = RevBytesNoSwap;
-		_LittleBitField = RevBitFieldNoSwap;
 		_SixtetsForInt = SixtetsForIntLittle;
 		_IntForSixtets = IntForSixtetsLittle;
 	} else {
@@ -524,7 +521,6 @@ void Swap_Init( void ) {
 		_LittleFloat = FloatSwap;
 		_BigRevBytes = RevBytesNoSwap;
 		_LittleRevBytes = RevBytesSwap;
-		_LittleBitField = RevBitFieldSwap;
 		_SixtetsForInt = SixtetsForIntBig;
 		_IntForSixtets = IntForSixtetsBig;
 	}
@@ -549,9 +545,14 @@ bool Swap_IsBigEndian( void ) {
 */
 
 void AssertFailed( const char *file, int line, const char *expression ) {
-	idLib::sys->DebugPrintf( "\n\nASSERTION FAILED!\n%s(%d): '%s'\n", file, line, expression );
+	if ( idLib::sys ) {
+		idLib::sys->DebugPrintf( "\n\nASSERTION FAILED!\n%s(%d): '%s'\n", file, line, expression );
+	}
 #ifdef _WIN32
-	__asm int 0x03
+// RAVEN BEGIN
+// jnewquist: Visual Studio platform independent breakpoint
+	__debugbreak();
+// RAVEN END
 #elif defined( __linux__ )
 	__asm__ __volatile__ ("int $0x03");
 #elif defined( MACOS_X )
